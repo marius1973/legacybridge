@@ -1,18 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>legacybridge</AssemblyName>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\LegacyBridge.Parser\LegacyBridge.Parser.csproj" />
-    <ProjectReference Include="..\LegacyBridge.Generator\LegacyBridge.Generator.csproj" />
-    <ProjectReference Include="..\LegacyBridge.Equivalence\LegacyBridge.Equivalence.csproj" />
+    <ProjectReference Include="..\..\samples\vfp-inventory\migrated\Application\VfpInventory.Application.csproj" />
+    <ProjectReference Include="..\..\samples\vfp-inventory\migrated\Domain\VfpInventory.Domain.csproj" />
   </ItemGroup>
 
 </Project>

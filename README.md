@@ -49,8 +49,8 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
 │        ⭐         │   → equivalence report with % functional match
 └─────────┬─────────┘
           ▼
-┌───────────────────┐   eval suite in CI: extraction precision, compile rate,
-│  Evals + Tracing  │   functional equivalence. Langfuse tracing per agent.
+┌───────────────────┐   eval suite in CI: extraction recall, compile, equivalence
+│  Evals            │   thresholds in evals/thresholds.json — build fails if they drop
 └───────────────────┘
 ```
 
@@ -65,13 +65,10 @@ npm install --prefix src/agents
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
 dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --output spec.yaml
 dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build
+dotnet run --project src/LegacyBridge.Cli -- verify samples/vfp-inventory/legacy --output samples/vfp-inventory/EQUIVALENCE-REPORT.md
 # Optional LLM pass on extract (Ollama local = $0):
 #   OLLAMA_HOST=http://127.0.0.1:11434 LEGACYBRIDGE_LLM=ollama \
 #   dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --llm --output spec.yaml
-
-# (Coming in v0.4 — equivalence tests)
-# docker compose up
-# legacybridge migrate samples/vfp-inventory --verify
 ```
 
 ## Results on the bundled sample
@@ -80,11 +77,11 @@ dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/lega
 |---|---|
 | Extractor entities (`inv_calc`) | P=1.00 R=1.00 *(CI)* |
 | Extractor rules (`inv_calc`) | P=1.00 R=1.00 *(CI, threshold R≥0.8)* |
-| Functional equivalence (`samples/vfp-inventory`) | 🎯 target ≥ 90% *(measured in CI from v0.4)* |
+| Functional equivalence (`inv_calc`) | **100%** (111/111, 1 SQL skipped) *(CI, threshold ≥90%)* |
 | Generated code compiling without manual edits | **100%** on `inv_calc` *(CI, 1 compile attempt)* |
 | Compile-fix loop iterations (`inv_calc`) | **0** — method bodies come from the IR AST, not an LLM |
-| Migration time (sample) | 🎯 minutes vs. ~40 h manual estimate |
-| Eval cases in CI | extractor eval + parser/generator tests + `dotnet build` on `migrated/` |
+| Migration time (sample) | minutes vs. ~40 h manual estimate |
+| Eval cases in CI | extract R≥0.8 · generate compiles · verify ≥90% — `evals/thresholds.json` |
 
 *Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence (or extractor recall) below the threshold.*
 
@@ -131,13 +128,14 @@ Parser line coverage is **99%** (coverlet); CI fails the build below 80%.
 ```
 src/
   LegacyBridge.Parser/    C# lexer + parser → unified IR (JSON)
-  LegacyBridge.Cli/       `legacybridge analyze|extract|generate`
-  LegacyBridge.Generator/ IR AST → .NET 8 DDD solution (no Scriban)
+  LegacyBridge.Cli/       `legacybridge analyze|extract|generate|verify`
+  LegacyBridge.Generator/ IR AST → .NET 8 DDD solution
+  LegacyBridge.Equivalence/ IR oracle vs migrated .NET
   agents/                 TypeScript extractor (LLM optional; Ollama = $0)
   dashboard/              (v0.6+) Next.js progress + equivalence dashboard
-evals/                    (v0.4+) datasets, CI-published reports
+evals/                    CI thresholds (recall, compile, equivalence)
 samples/
-  vfp-inventory/          real before/after case: legacy → migrated → report
+  vfp-inventory/          legacy → migrated → EQUIVALENCE-REPORT.md
 docs/                     architecture, migration guide, demo assets
 ```
 
@@ -152,7 +150,7 @@ docs/                     architecture, migration guide, demo assets
 - [x] **v0.1** — VFP lexer/parser → IR, CLI `analyze`, CI + tests
 - [x] **v0.2** — expression AST, coverage/`--strict`, CLI `extract` + eval (PowerBuilder subset still open)
 - [x] **v0.3** — .NET 8 generator (DDD + EF Core) from IR AST; `samples/vfp-inventory/migrated/` compiles
-- [ ] **v0.4** — equivalence tester + eval suite in CI
+- [x] **v0.4** — equivalence tester + eval suite in CI
 - [ ] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
 - [ ] **v0.6** — Next.js dashboard, PowerBuilder sample case
 - [ ] **v1.0** — second real-world case, launch write-up

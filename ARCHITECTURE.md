@@ -13,7 +13,7 @@ Why:
 2. **Testability** — the parser is plain C# with unit tests; no model drift.
 3. **Portability** — one IR serves both VFP and PowerBuilder frontends.
 
-## Modules (v0.3 status)
+## Modules (v0.4 status)
 
 | Module | Path | Status |
 |---|---|---|
@@ -23,7 +23,7 @@ Why:
 | CLI `analyze` / `extract` / `generate` | `src/LegacyBridge.Cli/` | ✅ |
 | Business Spec extractor (Agent 1) | `src/agents/` | ✅ |
 | .NET generator (Agent 2) | `src/LegacyBridge.Generator/` | ✅ |
-| Equivalence tester (Agent 3) | `src/agents/` | v0.4 |
+| Equivalence tester (Agent 3) | `src/LegacyBridge.Equivalence/` | ✅ |
 | MCP server | `src/agents/mcp-server/` | v0.5 |
 | Dashboard | `src/dashboard/` | v0.6 |
 
@@ -87,3 +87,12 @@ Method bodies are **deterministic**: `CsharpEmitter` walks `IrExpression` /
 `--build` runs `dotnet build` up to 3 times and logs each attempt. That is the
 compile-fix loop slot for an LLM repair pass later; on `inv_calc` the AST path
 succeeds on attempt 1 (0 retries). Output: `samples/vfp-inventory/migrated/`.
+
+## Agent 3: equivalence
+
+`legacybridge verify` runs the same cases on two oracles:
+
+1. **IR interpreter** — executes the AST (arithmetic, IF, SCAN/REPLACE, `ROUND`).
+2. **Migrated `ProductService`** — the generated .NET 8 application.
+
+Cases are a deterministic grid (zeros, negatives, cap-at-50, qty×cost around 10000) plus SCAN fixtures. Embedded SQL (`MonthlyReport`) is skipped, not failed. Threshold: `evals/thresholds.json` → `equivalence: 0.9`. Report: `samples/vfp-inventory/EQUIVALENCE-REPORT.md`.

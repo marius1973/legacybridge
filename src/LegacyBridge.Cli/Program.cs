@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LegacyBridge.Equivalence;
 using LegacyBridge.Generator;
 using LegacyBridge.Parser.Ir;
 using LegacyBridge.Parser.Lexing;
@@ -9,11 +10,11 @@ return Cli.Run(args);
 internal static class Cli
 {
     private const string Usage =
-        "usage:\n  legacybridge analyze <path> [--output ir.json] [--strict]\n  legacybridge extract <path> [--output spec.yaml] [--strict] [--llm]\n  legacybridge generate <path> [--output dir] [--strict] [--build]";
+        "usage:\n  legacybridge analyze <path> [--output ir.json] [--strict]\n  legacybridge extract <path> [--output spec.yaml] [--strict] [--llm]\n  legacybridge generate <path> [--output dir] [--strict] [--build]\n  legacybridge verify <path> [--output EQUIVALENCE-REPORT.md] [--min-match 0.9]";
 
     public static int Run(string[] args)
     {
-        if (args.Length < 2 || args[0] is not ("analyze" or "extract" or "generate"))
+        if (args.Length < 2 || args[0] is not ("analyze" or "extract" or "generate" or "verify"))
         {
             Console.Error.WriteLine(Usage);
             return 2;
@@ -23,6 +24,7 @@ internal static class Cli
         var strict = false;
         var llm = false;
         var build = false;
+        var minMatch = 0.9;
         string? path = null;
         string? outputPath = null;
         for (int i = 1; i < args.Length; i++)
@@ -30,6 +32,15 @@ internal static class Cli
             if (args[i] == "--strict") { strict = true; continue; }
             if (args[i] == "--llm") { llm = true; continue; }
             if (args[i] == "--build") { build = true; continue; }
+            if (args[i] == "--min-match")
+            {
+                if (i + 1 >= args.Length || !double.TryParse(args[++i], System.Globalization.CultureInfo.InvariantCulture, out minMatch))
+                {
+                    Console.Error.WriteLine(Usage);
+                    return 2;
+                }
+                continue;
+            }
             if (args[i] == "--output")
             {
                 if (i + 1 >= args.Length)
@@ -72,6 +83,9 @@ internal static class Cli
         if (cmd == "generate")
             return Generate(programs, outputPath ?? "generated", build);
 
+        if (cmd == "verify")
+            return Verify(programs, outputPath, minMatch);
+
         return Extract(programs, outputPath, llm);
     }
 
@@ -110,6 +124,24 @@ internal static class Cli
         Console.WriteLine($"build {(ok ? "ok" : "FAIL")} in {attempts} attempt(s)");
         if (!ok) Console.Error.Write(log);
         return ok ? 0 : 1;
+    }
+
+    private static int Verify(List<IrProgram> programs, string? outputPath, double minMatch)
+    {
+        var program = programs[0];
+        var report = Verifier.Run(program);
+        var md = Verifier.ToMarkdown(report, program.SourceName);
+        var dest = outputPath ?? "EQUIVALENCE-REPORT.md";
+        var dir = Path.GetDirectoryName(Path.GetFullPath(dest));
+        if (dir is not null) Directory.CreateDirectory(dir);
+        File.WriteAllText(dest, md);
+        Console.WriteLine($"equivalence {(report.Rate * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}% ({report.Matched}/{report.Matched + report.Mismatched}, skip {report.Skipped}) → {dest}");
+        if (report.Rate + 1e-9 < minMatch)
+        {
+            Console.Error.WriteLine($"match rate {(report.Rate * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}% is below {(minMatch * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture)}%");
+            return 1;
+        }
+        return 0;
     }
 
     private static int Extract(List<IrProgram> programs, string? outputPath, bool llm)

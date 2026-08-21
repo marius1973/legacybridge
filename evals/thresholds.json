@@ -1,0 +1,5 @@
+{
+  "extractor_recall": 0.8,
+  "compile": true,
+  "equivalence": 0.9
+}
