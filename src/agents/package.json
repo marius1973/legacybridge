@@ -1,0 +1,19 @@
+{
+  "name": "legacybridge-agents",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "extract": "tsx extract.ts",
+    "eval": "tsx eval.ts",
+    "test": "tsx --test extract.test.ts eval.test.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2"
+  }
+}

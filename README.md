@@ -59,11 +59,14 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
 ```bash
 git clone https://github.com/marius1973/legacybridge.git
 cd legacybridge
+npm install --prefix src/agents
 
-# Analyze the bundled VFP sample and emit its IR
+# Analyze / extract the bundled VFP sample
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
-# Unknown statements fail instead of degrading:
-#   ... analyze samples/vfp-inventory/legacy --strict
+dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --output spec.yaml
+# Optional LLM pass (Ollama local = $0):
+#   OLLAMA_HOST=http://127.0.0.1:11434 LEGACYBRIDGE_LLM=ollama \
+#   dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --llm --output spec.yaml
 
 # (Coming in v0.4 — full pipeline with agents)
 docker compose up
@@ -74,10 +77,14 @@ legacybridge migrate samples/vfp-inventory --verify
 
 | Metric | Value |
 |---|---|
+| Extractor entities (`inv_calc`) | P=1.00 R=1.00 *(CI)* |
+| Extractor rules (`inv_calc`) | P=1.00 R=1.00 *(CI, threshold R≥0.8)* |
 | Functional equivalence (`samples/vfp-inventory`) | 🎯 target ≥ 90% *(measured in CI from v0.4)* |
 | Generated code compiling without manual edits | 🎯 target ≥ 95% |
 | Migration time (sample) | 🎯 minutes vs. ~40 h manual estimate |
-| Eval cases in CI | growing — see `evals/` |
+| Eval cases in CI | extractor eval + parser tests — see `src/agents/` |
+
+*Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence (or extractor recall) below the threshold.*
 
 *Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence below the threshold.*
 
@@ -124,8 +131,8 @@ Parser line coverage is **99%** (coverlet); CI fails the build below 80%.
 ```
 src/
   LegacyBridge.Parser/    C# lexer + parser → unified IR (JSON)
-  LegacyBridge.Cli/       `legacybridge analyze|migrate|verify`
-  agents/                 (v0.2+) TypeScript agent orchestration + MCP server
+  LegacyBridge.Cli/       `legacybridge analyze|extract`
+  agents/                 TypeScript extractor (LLM optional; Ollama = $0)
   dashboard/              (v0.6+) Next.js progress + equivalence dashboard
 evals/                    (v0.4+) datasets, CI-published reports
 samples/
@@ -142,7 +149,7 @@ docs/                     architecture, migration guide, demo assets
 ## Roadmap
 
 - [x] **v0.1** — VFP lexer/parser → IR, CLI `analyze`, CI + tests
-- [ ] **v0.2** — expression AST ✅, coverage/`--strict` ✅, PowerBuilder subset, Business Spec extractor agent
+- [x] **v0.2** — expression AST, coverage/`--strict`, CLI `extract` + eval (PowerBuilder subset still open)
 - [ ] **v0.3** — .NET 8 generator (DDD + EF Core) from Business Spec
 - [ ] **v0.4** — equivalence tester + eval suite in CI
 - [ ] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)

@@ -20,8 +20,8 @@ Why:
 | VFP lexer | `src/LegacyBridge.Parser/Lexing/` | ✅ |
 | VFP parser → IR | `src/LegacyBridge.Parser/Parsing/` | ✅ |
 | Expression AST | `src/LegacyBridge.Parser/Parsing/ExpressionParser.cs` | ✅ |
-| CLI `analyze` | `src/LegacyBridge.Cli/` | ✅ |
-| Business Spec extractor (Agent 1) | `src/agents/` | v0.2.1 |
+| CLI `analyze` / `extract` | `src/LegacyBridge.Cli/` | ✅ |
+| Business Spec extractor (Agent 1) | `src/agents/` | ✅ |
 | .NET generator (Agent 2) | `src/agents/` | v0.3 |
 | Equivalence tester (Agent 3) | `src/agents/` | v0.4 |
 | MCP server | `src/agents/mcp-server/` | v0.5 |
@@ -61,3 +61,14 @@ The parser fails fast with line/column information (`ParserException`).
 Unknown statements degrade to `expression` + `RawExpr` so partial migrations
 still produce a complete IR. Pass `strict: true` (CLI `--strict`) to reject them
 instead. Embedded SQL is always captured as `raw`, even in strict mode.
+
+## Agent 1: business spec
+
+`legacybridge extract` parses source to IR, then `src/agents/extract.ts` maps IR → YAML
+validated against `src/agents/schemas/business-spec.schema.json`.
+
+The default path is **deterministic** (no API key) so CI can enforce recall ≥ 0.8
+against `samples/vfp-inventory/business-spec.expected.yaml`. Pass `--llm` to overlay
+the versioned prompt `src/agents/prompts/extractor.v1.md` via OpenAI, Anthropic, or
+**Ollama** (`OLLAMA_HOST`, default `http://127.0.0.1:11434` — $0). Invalid LLM YAML
+falls back to the IR mapping unless `LEGACYBRIDGE_LLM=required`.

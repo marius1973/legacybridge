@@ -69,8 +69,30 @@ jobs:
       - name: Smoke test — parse the bundled VFP sample
         run: dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release -- analyze samples/vfp-inventory/legacy --output artifacts/ir.json
 
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/agents/package-lock.json
+
+      - name: Install agents
+        run: npm ci --prefix src/agents
+
+      - name: Agent tests
+        run: npm test --prefix src/agents
+
+      - name: Extract business spec
+        run: dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release -- extract samples/vfp-inventory/legacy --output artifacts/spec.yaml
+
+      - name: Eval extractor recall ≥ 0.8
+        working-directory: src/agents
+        run: npx tsx eval.ts --got ../../artifacts/spec.yaml --golden ../../samples/vfp-inventory/business-spec.expected.yaml --min-recall 0.8
+
       - name: Upload IR artifact
         uses: actions/upload-artifact@v4
         with:
           name: sample-ir
-          path: artifacts/ir.json
+          path: |
+            artifacts/ir.json
+            artifacts/spec.yaml

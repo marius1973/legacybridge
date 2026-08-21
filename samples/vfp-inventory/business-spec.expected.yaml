@@ -1,0 +1,45 @@
+source: inv_calc.prg
+entities:
+  - name: Product
+    fields: [product, stock, unit_cost, total_value, year]
+rules:
+  - id: R1
+    description: High-value stock (lnValue > 10000) gets a 2% insurance surcharge (lnValue * 1.02)
+    routine: CalcStockValue
+  - id: R2
+    description: Otherwise a flat 5 is added to the stock value
+    routine: CalcStockValue
+  - id: R3
+    description: Discounts above 50% are capped at 50
+    routine: ApplyDiscount
+  - id: R4
+    description: Discounted amount is tnAmount minus tnAmount * tnPercent / 100
+    routine: ApplyDiscount
+  - id: R5
+    description: Only rows with stock > 0 are revalued
+    routine: RevalueAll
+  - id: R6
+    description: total_value is replaced with stock * unit_cost
+    routine: RevalueAll
+flows:
+  - name: CalcStockValue
+    kind: procedure
+    parameters: [tnQty, tnUnitCost]
+    steps: [local, assign, if, return]
+  - name: ApplyDiscount
+    kind: function
+    parameters: [tnAmount, tnPercent]
+    steps: [local, if, assign, return]
+  - name: RevalueAll
+    kind: procedure
+    parameters: []
+    steps: [expression, scan]
+  - name: MonthlyReport
+    kind: procedure
+    parameters: [tnYear]
+    steps: [sql]
+queries:
+  - routine: RevalueAll
+    sql: REPLACE total_value WITH stock * unit_cost
+  - routine: MonthlyReport
+    sql: SELECT product, SUM(total_value) FROM products WHERE year = tnYear GROUP BY product ORDER BY 2 DESC

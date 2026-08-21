@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://legacybridge.dev/schemas/business-spec.json",
+  "title": "LegacyBridge business spec",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "entities", "rules", "flows", "queries"],
+  "properties": {
+    "source": { "type": "string", "minLength": 1 },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "fields"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "fields": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "routine"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^R[0-9]+$" },
+          "description": { "type": "string", "minLength": 1 },
+          "routine": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "kind"],
+        "properties": {
+          "name": { "type": "string" },
+          "kind": { "type": "string" },
+          "parameters": { "type": "array", "items": { "type": "string" } },
+          "steps": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "queries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["routine", "sql"],
+        "properties": {
+          "routine": { "type": "string" },
+          "sql": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
