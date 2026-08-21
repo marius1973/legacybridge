@@ -5,7 +5,7 @@
 > Also available as a CLI, a web dashboard, and an **MCP server** for AI coding agents.
 
 ![CI](https://github.com/marius1973/legacybridge/actions/workflows/ci.yml/badge.svg)
-![Coverage](https://img.shields.io/badge/coverage-80%25%2B-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![MCP](https://img.shields.io/badge/MCP-server-blueviolet)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -62,6 +62,8 @@ cd legacybridge
 
 # Analyze the bundled VFP sample and emit its IR
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
+# Unknown statements fail instead of degrading:
+#   ... analyze samples/vfp-inventory/legacy --strict
 
 # (Coming in v0.4 — full pipeline with agents)
 docker compose up
@@ -99,18 +101,23 @@ Tools exposed: `analyze_legacy` · `generate_dotnet` · `run_equivalence`
 
 ## Supported language subset (honest scope)
 
-Current parser coverage (v0.1):
+Current parser coverage (v0.2):
 
 | Construct | VFP | PowerBuilder |
 |---|---|---|
-| `PROCEDURE` / `FUNCTION`, `LPARAMETERS` | ✅ | 🔜 v0.2 |
-| `IF / ELSE / ENDIF` | ✅ | 🔜 |
-| `FOR ... TO ... STEP / ENDFOR` | ✅ | 🔜 |
+| `PROCEDURE` / `FUNCTION`, `LPARAMETERS` / `PARAMETERS` | ✅ | 🔜 |
+| `LOCAL` (including `m.x`) | ✅ | 🔜 |
+| `IF / ELSEIF / ELSE / ENDIF` | ✅ | 🔜 |
+| `FOR ... TO ... STEP / ENDFOR` / `NEXT` | ✅ | 🔜 |
 | `SCAN / ENDSCAN`, `DO WHILE / ENDDO` | ✅ | 🔜 |
+| Expressions (typed AST) | ✅ | 🔜 |
 | Embedded SQL (`SELECT/INSERT/UPDATE/DELETE`) | raw capture | 🔜 |
 | Forms (`.scx`) / DataWindows | 🔜 v0.3 | 🔜 v0.3 |
 
-A small, well-tested subset beats a broad, fragile one. Expressions are currently captured as raw text in the IR; a full expression AST lands in v0.2.
+A small, well-tested subset beats a broad, fragile one. Expressions are a typed AST
+(`literal` / `identifier` / `unary` / `binary` / `call`); `RawText` is kept on each node.
+`--strict` fails on unknown statements; the default degrades them to raw `expression` nodes.
+Parser line coverage is **99%** (coverlet); CI fails the build below 80%.
 
 ## Repository layout
 
@@ -135,7 +142,7 @@ docs/                     architecture, migration guide, demo assets
 ## Roadmap
 
 - [x] **v0.1** — VFP lexer/parser → IR, CLI `analyze`, CI + tests
-- [ ] **v0.2** — expression AST, PowerBuilder subset, Business Spec extractor agent
+- [ ] **v0.2** — expression AST ✅, coverage/`--strict` ✅, PowerBuilder subset, Business Spec extractor agent
 - [ ] **v0.3** — .NET 8 generator (DDD + EF Core) from Business Spec
 - [ ] **v0.4** — equivalence tester + eval suite in CI
 - [ ] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)

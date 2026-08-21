@@ -34,11 +34,43 @@ public class LexerTests
     }
 
     [Fact]
+    public void Recognizes_dotted_boolean_literals()
+    {
+        var tokens = new Lexer(".T. .F.").Tokenize();
+        Assert.Contains(tokens, t => t.Kind == TokenKind.True);
+        Assert.Contains(tokens, t => t.Kind == TokenKind.False);
+    }
+
+    [Fact]
+    public void Doubled_quotes_are_escapes()
+    {
+        var tokens = new Lexer("'it''s' \"say \"\"hi\"\"\"").Tokenize();
+        var strings = tokens.Where(t => t.Kind == TokenKind.StringLiteral).Select(t => t.Lexeme).ToList();
+        Assert.Equal(new[] { "it's", "say \"hi\"" }, strings);
+    }
+
+    [Fact]
     public void Lexes_strings_with_all_three_delimiters()
     {
         var tokens = new Lexer("'one' \"two\" [three]").Tokenize();
         var strings = tokens.Where(t => t.Kind == TokenKind.StringLiteral).Select(t => t.Lexeme).ToList();
         Assert.Equal(new[] { "one", "two", "three" }, strings);
+    }
+
+    [Fact]
+    public void Note_at_line_start_is_a_comment()
+    {
+        var tokens = new Lexer("NOTE ignored\nx = 1").Tokenize();
+        var significant = tokens.Where(t => t.Kind is not TokenKind.NewLine and not TokenKind.Eof).ToList();
+        Assert.Equal(TokenKind.Identifier, significant[0].Kind);
+        Assert.Equal("x", significant[0].Lexeme);
+    }
+
+    [Fact]
+    public void Unexpected_character_throws()
+    {
+        Assert.Throws<LexerException>(() => new Lexer("x @ 1").Tokenize());
+        Assert.Throws<LexerException>(() => new Lexer("x ! 1").Tokenize());
     }
 
     [Fact]

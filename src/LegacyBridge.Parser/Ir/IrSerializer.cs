@@ -12,4 +12,7 @@ public static class IrSerializer
 
     public static string ToJson(IrProgram program) =>
         JsonSerializer.Serialize(program, Options);
+
+    public static string ToJson(IReadOnlyList<IrProgram> programs) =>
+        JsonSerializer.Serialize(programs, Options);
 }

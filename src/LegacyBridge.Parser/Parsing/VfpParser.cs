@@ -5,19 +5,24 @@ namespace LegacyBridge.Parser.Parsing;
 
 /// <summary>
 /// Recursive-descent parser for the VFP subset. Produces <see cref="IrProgram"/>.
-/// Control flow is structured; expressions are captured as raw token text.
+/// Control flow is structured; expressions are a typed AST.
 /// </summary>
 public sealed class VfpParser
 {
     private readonly List<Token> _tokens;
+    private readonly bool _strict;
     private int _pos;
 
-    public VfpParser(List<Token> tokens) => _tokens = tokens;
+    public VfpParser(List<Token> tokens, bool strict = false)
+    {
+        _tokens = tokens;
+        _strict = strict;
+    }
 
-    public static IrProgram Parse(string source, string sourceName)
+    public static IrProgram Parse(string source, string sourceName, bool strict = false)
     {
         var tokens = new Lexer(source).Tokenize();
-        return new VfpParser(tokens).ParseProgram(sourceName);
+        return new VfpParser(tokens, strict).ParseProgram(sourceName);
     }
 
     public IrProgram ParseProgram(string sourceName)
@@ -34,7 +39,6 @@ public sealed class VfpParser
 
     private IrRoutine ParseRoutine()
     {
-        Token head = Current;
         string kind;
         if (Match(TokenKind.Procedure)) kind = "procedure";
         else if (Match(TokenKind.Function)) kind = "function";
@@ -48,7 +52,7 @@ public sealed class VfpParser
         {
             do
             {
-                parameters.Add(Expect(TokenKind.Identifier, "Expected parameter name").Lexeme);
+                parameters.Add(ParseDottedName());
             } while (Match(TokenKind.Comma));
         }
 
@@ -77,8 +81,10 @@ public sealed class VfpParser
 
         switch (t.Kind)
         {
-            case TokenKind.Identifier when PeekKind(1) == TokenKind.Assign:
+            case TokenKind.Identifier when LooksLikeAssignment():
                 return ParseAssignment();
+            case TokenKind.Local:
+                return ParseLocal();
             case TokenKind.If:
                 return ParseIf();
             case TokenKind.For:
@@ -89,26 +95,37 @@ public sealed class VfpParser
                 return ParseDoWhile();
             case TokenKind.Return:
                 Advance();
-                return new IrStatement("return", t.Line, Expression: CaptureExpression());
+                return new IrStatement("return", t.Line, Expression: TryParseExpr());
             case TokenKind.Select or TokenKind.Insert or TokenKind.Update or TokenKind.Delete:
-                return new IrStatement("sql", t.Line, Expression: CaptureExpression());
+                return new IrStatement("sql", t.Line, Expression: new RawExpr(CaptureExpression()));
             default:
-                return new IrStatement("expression", t.Line, Expression: CaptureExpression());
+                if (_strict)
+                    throw Error(t, $"Unknown statement '{t.Lexeme}'");
+                return new IrStatement("expression", t.Line, Expression: new RawExpr(CaptureExpression()));
         }
     }
 
     private IrStatement ParseAssignment()
     {
-        var target = Expect(TokenKind.Identifier, "Expected assignment target");
+        int line = Current.Line;
+        var target = ParseDottedName();
         Expect(TokenKind.Assign, "Expected '='");
-        return new IrStatement("assign", target.Line, Target: target.Lexeme,
-            Expression: CaptureExpression());
+        return new IrStatement("assign", line, Target: target, Expression: ParseExpr());
+    }
+
+    private IrStatement ParseLocal()
+    {
+        var tok = Expect(TokenKind.Local, "Expected LOCAL");
+        var names = new List<string> { ParseDottedName() };
+        while (Match(TokenKind.Comma))
+            names.Add(ParseDottedName());
+        return new IrStatement("local", tok.Line, Target: string.Join(", ", names));
     }
 
     private IrStatement ParseIf()
     {
         var ifToken = Expect(TokenKind.If, "Expected IF");
-        var condition = CaptureExpression();
+        var condition = ParseExpr();
         var then = ParseBlock(TokenKind.EndIf, TokenKind.Else, TokenKind.ElseIf);
         List<IrStatement>? elseBranch = null;
 
@@ -131,7 +148,7 @@ public sealed class VfpParser
     private IrStatement ParseElseIfAsIf()
     {
         var elseIf = Expect(TokenKind.ElseIf, "Expected ELSEIF");
-        var condition = CaptureExpression();
+        var condition = ParseExpr();
         var then = ParseBlock(TokenKind.EndIf, TokenKind.Else, TokenKind.ElseIf);
         List<IrStatement>? elseBranch = null;
         if (Match(TokenKind.Else))
@@ -147,12 +164,12 @@ public sealed class VfpParser
         var forToken = Expect(TokenKind.For, "Expected FOR");
         var variable = Expect(TokenKind.Identifier, "Expected loop variable").Lexeme;
         Expect(TokenKind.Assign, "Expected '=' after loop variable");
-        var from = CaptureUntil(TokenKind.To);
+        var from = ParseExpr(TokenKind.To);
         Expect(TokenKind.To, "Expected TO");
-        var to = CaptureUntil(TokenKind.Step, TokenKind.NewLine);
-        string? step = null;
+        var to = ParseExpr(TokenKind.Step, TokenKind.NewLine);
+        IrExpression? step = null;
         if (Match(TokenKind.Step))
-            step = CaptureExpression();
+            step = ParseExpr();
 
         var body = ParseBlock(TokenKind.EndFor, TokenKind.Next);
         ExpectAny("Expected ENDFOR/NEXT", TokenKind.EndFor, TokenKind.Next);
@@ -163,7 +180,8 @@ public sealed class VfpParser
     private IrStatement ParseScan()
     {
         var scan = Expect(TokenKind.Scan, "Expected SCAN");
-        var condition = CaptureExpression(); // optional FOR/WHILE clause, raw
+        _ = Match(TokenKind.For) || Match(TokenKind.While);
+        var condition = TryParseExpr();
         var body = ParseBlock(TokenKind.EndScan);
         Expect(TokenKind.EndScan, "Expected ENDSCAN");
         return new IrStatement("scan", scan.Line, Expression: condition, Body: body);
@@ -173,13 +191,45 @@ public sealed class VfpParser
     {
         var doToken = Expect(TokenKind.Do, "Expected DO");
         Expect(TokenKind.While, "Expected WHILE");
-        var condition = CaptureExpression();
+        var condition = ParseExpr();
         var body = ParseBlock(TokenKind.EndDo);
         Expect(TokenKind.EndDo, "Expected ENDDO");
         return new IrStatement("doWhile", doToken.Line, Expression: condition, Body: body);
     }
 
     // ---- token helpers ----
+
+    private bool LooksLikeAssignment()
+    {
+        int i = 0;
+        if (PeekKind(i) != TokenKind.Identifier) return false;
+        i++;
+        while (PeekKind(i) == TokenKind.Dot && PeekKind(i + 1) == TokenKind.Identifier)
+            i += 2;
+        return PeekKind(i) == TokenKind.Assign;
+    }
+
+    private string ParseDottedName()
+    {
+        var name = Expect(TokenKind.Identifier, "Expected identifier").Lexeme;
+        while (Match(TokenKind.Dot))
+            name += "." + Expect(TokenKind.Identifier, "Expected identifier").Lexeme;
+        return name;
+    }
+
+    private IrExpression ParseExpr(params TokenKind[] extraStops) =>
+        ExpressionParser.Parse(_tokens, ref _pos, extraStops);
+
+    private IrExpression? TryParseExpr()
+    {
+        if (Check(TokenKind.NewLine) || Check(TokenKind.Eof)
+            || Check(TokenKind.EndProc) || Check(TokenKind.EndFunc)
+            || Check(TokenKind.EndIf) || Check(TokenKind.Else) || Check(TokenKind.ElseIf)
+            || Check(TokenKind.EndFor) || Check(TokenKind.Next)
+            || Check(TokenKind.EndScan) || Check(TokenKind.EndDo))
+            return null;
+        return ParseExpr();
+    }
 
     /// <summary>Captures raw text of everything up to the end of the statement.</summary>
     private string CaptureExpression() => CaptureUntil(TokenKind.NewLine);
@@ -226,7 +276,7 @@ public sealed class VfpParser
 
     private Token Expect(TokenKind kind, string message)
     {
-        SkipNewLinesInline();
+        SkipNewLines();
         if (Current.Kind != kind) throw Error(Current, message);
         var t = Current;
         Advance();
@@ -235,7 +285,7 @@ public sealed class VfpParser
 
     private Token ExpectAny(string message, params TokenKind[] kinds)
     {
-        SkipNewLinesInline();
+        SkipNewLines();
         foreach (var k in kinds)
             if (Current.Kind == k)
             {
@@ -244,11 +294,6 @@ public sealed class VfpParser
                 return t;
             }
         throw Error(Current, message);
-    }
-
-    private void SkipNewLinesInline()
-    {
-        while (Check(TokenKind.NewLine)) Advance();
     }
 
     private static ParserException Error(Token token, string message) =>

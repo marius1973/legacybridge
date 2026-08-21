@@ -1,8 +1,8 @@
 using LegacyBridge.Parser.Ir;
+using LegacyBridge.Parser.Lexing;
 using LegacyBridge.Parser.Parsing;
 
-// LegacyBridge CLI — v0.1
-// usage: legacybridge analyze <file-or-directory> [--output ir.json]
+// usage: legacybridge analyze <file-or-directory> [--output ir.json] [--strict]
 
 return Cli.Run(args);
 
@@ -12,33 +12,59 @@ internal static class Cli
     {
         if (args.Length < 2 || args[0] != "analyze")
         {
-            Console.Error.WriteLine("usage: legacybridge analyze <file-or-directory> [--output ir.json]");
+            Console.Error.WriteLine("usage: legacybridge analyze <file-or-directory> [--output ir.json] [--strict]");
             return 2;
         }
 
-        var path = args[1];
-        var outputIdx = Array.IndexOf(args, "--output");
-        var outputPath = outputIdx >= 0 && outputIdx + 1 < args.Length
-            ? args[outputIdx + 1]
-            : null;
+        var strict = false;
+        string? path = null;
+        string? outputPath = null;
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--strict") { strict = true; continue; }
+            if (args[i] == "--output")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Console.Error.WriteLine("usage: legacybridge analyze <file-or-directory> [--output ir.json] [--strict]");
+                    return 2;
+                }
+                outputPath = args[++i];
+                continue;
+            }
+            if (path is null) path = args[i];
+        }
+
+        if (path is null)
+        {
+            Console.Error.WriteLine("usage: legacybridge analyze <file-or-directory> [--output ir.json] [--strict]");
+            return 2;
+        }
 
         var files = Directory.Exists(path)
             ? Directory.GetFiles(path, "*.prg", SearchOption.AllDirectories)
             : new[] { path };
 
         var programs = new List<IrProgram>();
-        foreach (var file in files)
+        try
         {
-            var source = File.ReadAllText(file);
-            var program = VfpParser.Parse(source, Path.GetFileName(file));
-            programs.Add(program);
-            Console.WriteLine($"parsed {file}: {program.Routines.Count} routine(s)");
+            foreach (var file in files)
+            {
+                var source = File.ReadAllText(file);
+                var program = VfpParser.Parse(source, Path.GetFileName(file), strict);
+                programs.Add(program);
+                Console.WriteLine($"parsed {file}: {program.Routines.Count} routine(s)");
+            }
+        }
+        catch (Exception ex) when (ex is ParserException or LexerException)
+        {
+            Console.Error.WriteLine(ex.Message);
+            return 1;
         }
 
         var json = programs.Count == 1
             ? IrSerializer.ToJson(programs[0])
-            : System.Text.Json.JsonSerializer.Serialize(programs,
-                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            : IrSerializer.ToJson(programs);
 
         if (outputPath is not null)
         {

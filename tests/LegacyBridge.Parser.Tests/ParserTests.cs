@@ -38,7 +38,9 @@ public class ParserTests
         var ifStmt = Assert.Single(program.Routines[0].Body.Where(s => s.Kind == "if"));
         Assert.NotNull(ifStmt.Then);
         Assert.NotNull(ifStmt.Else);
-        Assert.Equal("lnTotal > 1000", ifStmt.Expression);
+        Assert.Equal("lnTotal > 1000", ifStmt.Expression!.RawText);
+        var cmp = Assert.IsType<BinaryExpr>(ifStmt.Expression);
+        Assert.Equal(">", cmp.Op);
         Assert.Single(ifStmt.Then!);
         Assert.Single(ifStmt.Else!);
     }
@@ -59,9 +61,9 @@ public class ParserTests
         var program = VfpParser.Parse(src, "loop.prg");
         var loop = Assert.Single(program.Routines[0].Body.Where(s => s.Kind == "for"));
         Assert.Equal("i", loop.LoopVariable);
-        Assert.Equal("1", loop.From);
-        Assert.Equal("tnN", loop.To);
-        Assert.Equal("2", loop.Step);
+        Assert.Equal("1", loop.From!.RawText);
+        Assert.Equal("tnN", loop.To!.RawText);
+        Assert.Equal("2", loop.Step!.RawText);
         Assert.Single(loop.Body!);
     }
 
@@ -95,7 +97,7 @@ public class ParserTests
             """;
         var program = VfpParser.Parse(src, "sql.prg");
         var sql = Assert.Single(program.Routines[0].Body.Where(s => s.Kind == "sql"));
-        Assert.Contains("FROM clients", sql.Expression);
+        Assert.Contains("FROM clients", sql.Expression!.RawText);
     }
 
     [Fact]
@@ -112,5 +114,28 @@ public class ParserTests
     {
         Assert.Throws<ParserException>(() =>
             VfpParser.Parse("PROCEDURE Broken\n  x = 1", "broken.prg"));
+    }
+
+    [Fact]
+    public void Parses_inv_calc_sample_with_typed_ast()
+    {
+        var src = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "inv_calc.prg"));
+        var program = VfpParser.Parse(src, "inv_calc.prg");
+        Assert.Equal(4, program.Routines.Count);
+
+        var calc = program.Routines[0];
+        var assign = Assert.Single(calc.Body.Where(s => s.Kind == "assign"));
+        var mul = Assert.IsType<BinaryExpr>(assign.Expression);
+        Assert.Equal("*", mul.Op);
+
+        var ret = Assert.Single(calc.Body.Where(s => s.Kind == "return"));
+        var round = Assert.IsType<CallExpr>(ret.Expression);
+        Assert.Equal("ROUND", round.Name);
+        Assert.Equal(2, round.Args.Count);
+
+        var scan = Assert.Single(program.Routines[2].Body.Where(s => s.Kind == "scan"));
+        var cond = Assert.IsType<BinaryExpr>(scan.Expression);
+        Assert.Equal(">", cond.Op);
+        Assert.Equal("stock", Assert.IsType<IdentifierExpr>(cond.Left).Name);
     }
 }

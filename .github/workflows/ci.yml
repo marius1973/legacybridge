@@ -26,7 +26,45 @@ jobs:
         run: dotnet format --verify-no-changes --no-restore || echo "::warning::format drift — run dotnet format"
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --logger "trx" --collect:"XPlat Code Coverage"
+        run: >
+          dotnet test --no-build --configuration Release
+          --logger trx
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts/coverage
+
+      - name: Coverage ≥80%
+        run: |
+          python3 - <<'PY'
+          import glob, pathlib, sys, xml.etree.ElementTree as ET
+          files = glob.glob('artifacts/coverage/**/coverage.cobertura.xml', recursive=True)
+          if not files:
+              sys.exit('no coverage.cobertura.xml produced')
+          rates = []
+          for f in files:
+              root = ET.parse(f).getroot()
+              for pkg in root.iter('package'):
+                  name = pkg.get('name', '')
+                  if 'LegacyBridge.Parser' in name and 'Tests' not in name:
+                      rates.append(float(pkg.get('line-rate', 0)))
+          if not rates:
+              rates.append(float(ET.parse(files[0]).getroot().get('line-rate', 0)))
+          pct = max(rates) * 100
+          pathlib.Path('artifacts').mkdir(exist_ok=True)
+          pathlib.Path('artifacts/coverage.txt').write_text(f'{pct:.1f}\n')
+          print(f'Parser line coverage: {pct:.1f}%')
+          if pct < 80:
+              sys.exit(f'coverage {pct:.1f}% is below 80%')
+          PY
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: |
+            artifacts/coverage/**/*.xml
+            artifacts/coverage.txt
+          if-no-files-found: warn
 
       - name: Smoke test — parse the bundled VFP sample
         run: dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release -- analyze samples/vfp-inventory/legacy --output artifacts/ir.json

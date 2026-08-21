@@ -34,6 +34,7 @@ public sealed class Lexer
             ["WHILE"] = TokenKind.While,
             ["ENDDO"] = TokenKind.EndDo,
             ["RETURN"] = TokenKind.Return,
+            ["LOCAL"] = TokenKind.Local,
             ["SELECT"] = TokenKind.Select,
             ["INSERT"] = TokenKind.Insert,
             ["UPDATE"] = TokenKind.Update,
@@ -163,6 +164,8 @@ public sealed class Lexer
             "AND." => TokenKind.And,
             "OR." => TokenKind.Or,
             "NOT." => TokenKind.Not,
+            "T." => TokenKind.True,
+            "F." => TokenKind.False,
             _ => (TokenKind?)null
         };
         if (kind is not null)
@@ -228,13 +231,23 @@ public sealed class Lexer
         int line = _line, col = _col;
         Advance(); // opening quote
         var sb = new StringBuilder();
-        while (_pos < _src.Length && _src[_pos] != terminator && _src[_pos] is not ('\r' or '\n'))
+        while (_pos < _src.Length && _src[_pos] is not ('\r' or '\n'))
         {
+            if (_src[_pos] == terminator)
+            {
+                if (Peek(1) == terminator)
+                {
+                    sb.Append(terminator);
+                    Advance();
+                    Advance();
+                    continue;
+                }
+                Advance(); // closing
+                break;
+            }
             sb.Append(_src[_pos]);
             Advance();
         }
-        if (_pos < _src.Length && _src[_pos] == terminator)
-            Advance(); // closing quote
         _atLineStart = false;
         return new Token(TokenKind.StringLiteral, sb.ToString(), line, col);
     }

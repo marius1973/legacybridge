@@ -31,6 +31,7 @@ public enum TokenKind
     While,
     EndDo,
     Return,
+    Local,
 
     // Data / SQL
     Select,
@@ -41,10 +42,12 @@ public enum TokenKind
     Replace,
     With,
 
-    // Logical operators (.AND. / .OR. / .NOT.)
+    // Logical operators (.AND. / .OR. / .NOT.) and literals (.T. / .F.)
     And,
     Or,
     Not,
+    True,
+    False,
 
     // Operators & punctuation
     Comma,
