@@ -1,0 +1,12 @@
+bin/
+obj/
+out/
+artifacts/
+*.user
+.vs/
+.vscode/
+node_modules/
+dist/
+.env
+*.trx
+TestResults/

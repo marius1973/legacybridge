@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Format check
+        run: dotnet format --verify-no-changes --no-restore || echo "::warning::format drift — run dotnet format"
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --logger "trx" --collect:"XPlat Code Coverage"
+
+      - name: Smoke test — parse the bundled VFP sample
+        run: dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release -- analyze samples/vfp-inventory/legacy --output artifacts/ir.json
+
+      - name: Upload IR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-ir
+          path: artifacts/ir.json
