@@ -1,0 +1,52 @@
+# LegacyBridge — normalización de fin de línea
+#
+# Regla base: Git guarda SIEMPRE LF en el repositorio y entrega el final de
+# línea nativo en el árbol de trabajo (CRLF en Windows). Así el generador puede
+# emitir LF y Visual Studio puede guardar CRLF sin que aparezca ni un diff.
+
+* text=auto
+
+# --- Código fuente ---------------------------------------------------------
+*.cs        text diff=csharp
+*.ts        text
+*.tsx       text
+*.js        text
+*.mjs       text
+*.prg       text
+
+# --- Proyecto / configuración ---------------------------------------------
+*.csproj    text
+*.props     text
+*.targets   text
+*.json      text
+*.yml       text
+*.yaml      text
+*.md        text diff=markdown
+*.editorconfig text
+
+# Visual Studio escribe los .sln con CRLF y se queja si no lo están.
+*.sln       text eol=crlf
+
+# --- Deben ser LF sí o sí (se ejecutan en Linux / CI) ---------------------
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf
+docker-compose.yml text eol=lf
+
+# --- Binarios: nunca tocar -----------------------------------------------
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.zip       binary
+*.dll       binary
+*.exe       binary
+*.snk       binary
+*.dbf       binary
+*.fpt       binary
+*.cdx       binary
+
+# --- Estadísticas de GitHub Linguist --------------------------------------
+samples/** linguist-documentation
