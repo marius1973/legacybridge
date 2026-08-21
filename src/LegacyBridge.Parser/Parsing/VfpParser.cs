@@ -31,7 +31,10 @@ public sealed class VfpParser
         SkipNewLines();
         while (!Check(TokenKind.Eof))
         {
-            routines.Add(ParseRoutine());
+            if (Check(TokenKind.Procedure) || Check(TokenKind.Function))
+                routines.Add(ParseRoutine());
+            else
+                SkipTopLevelJunk();
             SkipNewLines();
         }
         return new IrProgram(sourceName, routines);
@@ -47,8 +50,18 @@ public sealed class VfpParser
         var name = Expect(TokenKind.Identifier, "Expected routine name").Lexeme;
         var parameters = new List<string>();
 
+        if (Match(TokenKind.LeftParen))
+        {
+            if (!Check(TokenKind.RightParen))
+            {
+                do { parameters.Add(ParseDottedName()); }
+                while (Match(TokenKind.Comma));
+            }
+            Expect(TokenKind.RightParen, "Expected ')'");
+        }
+
         SkipNewLines();
-        if (Match(TokenKind.LParameters) || Match(TokenKind.Parameters))
+        if (parameters.Count == 0 && (Match(TokenKind.LParameters) || Match(TokenKind.Parameters)))
         {
             do
             {
@@ -56,8 +69,9 @@ public sealed class VfpParser
             } while (Match(TokenKind.Comma));
         }
 
-        var body = ParseBlock(TokenKind.EndProc, TokenKind.EndFunc);
-        ExpectAny("Expected ENDPROC/ENDFUNC", TokenKind.EndProc, TokenKind.EndFunc);
+        var body = ParseBlock(TokenKind.EndProc, TokenKind.EndFunc, TokenKind.Procedure, TokenKind.Function);
+        if (Check(TokenKind.EndProc) || Check(TokenKind.EndFunc))
+            ExpectAny("Expected ENDPROC/ENDFUNC", TokenKind.EndProc, TokenKind.EndFunc);
         return new IrRoutine(name, kind, parameters, body);
     }
 
@@ -93,6 +107,8 @@ public sealed class VfpParser
                 return ParseScan();
             case TokenKind.Do when PeekKind(1) == TokenKind.While:
                 return ParseDoWhile();
+            case TokenKind.With:
+                return ParseWith();
             case TokenKind.Return:
                 Advance();
                 return new IrStatement("return", t.Line, Expression: TryParseExpr());
@@ -117,15 +133,20 @@ public sealed class VfpParser
     {
         var tok = Expect(TokenKind.Local, "Expected LOCAL");
         var names = new List<string> { ParseDottedName() };
+        SkipAsClause();
         while (Match(TokenKind.Comma))
+        {
             names.Add(ParseDottedName());
+            SkipAsClause();
+        }
         return new IrStatement("local", tok.Line, Target: string.Join(", ", names));
     }
 
     private IrStatement ParseIf()
     {
         var ifToken = Expect(TokenKind.If, "Expected IF");
-        var condition = ParseExpr();
+        var condition = ParseExpr(TokenKind.Then);
+        Match(TokenKind.Then);
         var then = ParseBlock(TokenKind.EndIf, TokenKind.Else, TokenKind.ElseIf);
         List<IrStatement>? elseBranch = null;
 
@@ -148,7 +169,8 @@ public sealed class VfpParser
     private IrStatement ParseElseIfAsIf()
     {
         var elseIf = Expect(TokenKind.ElseIf, "Expected ELSEIF");
-        var condition = ParseExpr();
+        var condition = ParseExpr(TokenKind.Then);
+        Match(TokenKind.Then);
         var then = ParseBlock(TokenKind.EndIf, TokenKind.Else, TokenKind.ElseIf);
         List<IrStatement>? elseBranch = null;
         if (Match(TokenKind.Else))
@@ -195,6 +217,30 @@ public sealed class VfpParser
         var body = ParseBlock(TokenKind.EndDo);
         Expect(TokenKind.EndDo, "Expected ENDDO");
         return new IrStatement("doWhile", doToken.Line, Expression: condition, Body: body);
+    }
+
+    private IrStatement ParseWith()
+    {
+        var with = Expect(TokenKind.With, "Expected WITH");
+        var raw = CaptureUntil(TokenKind.EndWith);
+        Expect(TokenKind.EndWith, "Expected ENDWITH");
+        return new IrStatement("with", with.Line, Expression: new RawExpr(raw));
+    }
+
+    private void SkipAsClause()
+    {
+        if (!Check(TokenKind.Identifier) || !Current.Lexeme.Equals("AS", StringComparison.OrdinalIgnoreCase))
+            return;
+        Advance();
+        while (!Check(TokenKind.Eof) && !Check(TokenKind.NewLine) && !Check(TokenKind.Comma)
+               && Current.Kind is not (TokenKind.EndProc or TokenKind.EndFunc))
+            Advance();
+    }
+
+    private void SkipTopLevelJunk()
+    {
+        if (Check(TokenKind.NewLine) || Check(TokenKind.Eof)) return;
+        CaptureUntil(TokenKind.NewLine);
     }
 
     // ---- token helpers ----

@@ -18,7 +18,7 @@ public static class CsharpEmitter
             b.Value.Equals(".T.", StringComparison.OrdinalIgnoreCase) ? "true" : "false",
         IdentifierExpr i => (id ?? Names.Ident)(i.Name),
         BinaryExpr b => $"({Expr(b.Left, id)} {Op(b.Op)} {Expr(b.Right, id)})",
-        UnaryExpr { Op: ".NOT." or "NOT" } u => $"!({Expr(u.Operand, id)})",
+        UnaryExpr { Op: ".NOT." or "NOT" or "!" } u => $"!({Expr(u.Operand, id)})",
         UnaryExpr u => $"{(u.Op == "-" ? "-" : "+")}{Expr(u.Operand, id)}",
         CallExpr c when c.Name.Equals("ROUND", StringComparison.OrdinalIgnoreCase) =>
             $"Math.Round({Expr(c.Args[0], id)}, (int)({Expr(c.Args[1], id)}), MidpointRounding.AwayFromZero)",

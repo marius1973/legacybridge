@@ -30,6 +30,7 @@ export default function Page() {
   async function run() {
     setBusy(true);
     setErr("");
+    setSample(null);
     setSteps(STEPS.map((s) => ({ ...s, status: "idle" })));
     const body = new FormData();
     if (file) body.append("file", file);

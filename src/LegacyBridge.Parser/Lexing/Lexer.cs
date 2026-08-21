@@ -42,6 +42,11 @@ public sealed class Lexer
             ["USE"] = TokenKind.Use,
             ["REPLACE"] = TokenKind.Replace,
             ["WITH"] = TokenKind.With,
+            ["ENDWITH"] = TokenKind.EndWith,
+            ["THEN"] = TokenKind.Then,
+            ["AND"] = TokenKind.And,
+            ["OR"] = TokenKind.Or,
+            ["NOT"] = TokenKind.Not,
         };
 
     private readonly string _src;
@@ -210,6 +215,13 @@ public sealed class Lexer
         _atLineStart = false;
         if (Keywords.TryGetValue(word, out var kind))
             return new Token(kind, word, line, col);
+        // VFP allows 4+ character abbreviations: FUNCTIO → FUNCTION, ENDI → ENDIF.
+        if (word.Length >= 4)
+        {
+            var hits = Keywords.Where(kv => kv.Key.StartsWith(word, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (hits.Count == 1)
+                return new Token(hits[0].Value, word, line, col);
+        }
         return new Token(TokenKind.Identifier, word, line, col);
     }
 
@@ -282,11 +294,14 @@ public sealed class Lexer
                 break;
             case '!':
                 if (Peek(1) == '=') { Advance(); kind = TokenKind.NotEquals; lexeme = "!="; }
-                else throw new LexerException($"Unexpected '!' at {line}:{col}");
+                else kind = TokenKind.Not; // VFP: !EOF() is .NOT. EOF()
                 break;
             case '#': kind = TokenKind.NotEquals; break;
             default:
-                throw new LexerException($"Unexpected character '{c}' at {line}:{col}");
+                // ponytail: skip unknown punctuation (:, @, ?) so real .prg files still lex
+                Advance();
+                _atLineStart = false;
+                return NextToken();
         }
 
         Advance();

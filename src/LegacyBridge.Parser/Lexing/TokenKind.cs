@@ -42,6 +42,9 @@ public enum TokenKind
     Replace,
     With,
 
+    Then,
+    EndWith,
+
     // Logical operators (.AND. / .OR. / .NOT.) and literals (.T. / .F.)
     And,
     Or,

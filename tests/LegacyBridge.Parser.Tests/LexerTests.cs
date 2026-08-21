@@ -67,10 +67,17 @@ public class LexerTests
     }
 
     [Fact]
-    public void Unexpected_character_throws()
+    public void Unknown_punctuation_is_skipped()
     {
-        Assert.Throws<LexerException>(() => new Lexer("x @ 1").Tokenize());
-        Assert.Throws<LexerException>(() => new Lexer("x ! 1").Tokenize());
+        var tokens = new Lexer("x @ 1").Tokenize();
+        var kinds = tokens.Where(t => t.Kind is not TokenKind.NewLine and not TokenKind.Eof).Select(t => t.Kind).ToArray();
+        Assert.Equal(new[] { TokenKind.Identifier, TokenKind.Number }, kinds);
+    }
+
+    [Fact]
+    public void Bang_lexes_as_not()
+    {
+        Assert.Equal(TokenKind.Not, new Lexer("!x").Tokenize()[0].Kind);
     }
 
     [Fact]

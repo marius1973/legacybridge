@@ -100,7 +100,7 @@ public sealed class IrInterpreter
         LiteralExpr { LiteralKind: "string" } s => s.Value,
         IdentifierExpr i => Lookup(i.Name, env, row),
         BinaryExpr b => Bin(b.Op, Eval(b.Left, env, row), Eval(b.Right, env, row)),
-        UnaryExpr { Op: ".NOT." or "NOT" } u => !Truth(Eval(u.Operand, env, row)),
+        UnaryExpr { Op: ".NOT." or "NOT" or "!" } u => !Truth(Eval(u.Operand, env, row)),
         UnaryExpr { Op: "-" } u => -Num(Eval(u.Operand, env, row)),
         UnaryExpr u => Num(Eval(u.Operand, env, row)),
         CallExpr c when c.Name.Equals("ROUND", StringComparison.OrdinalIgnoreCase) =>

@@ -158,4 +158,63 @@ public class RobustnessTests
         Assert.Equal("sql", sql.Kind);
         Assert.Contains("INSERT", sql.Expression!.RawText);
     }
+
+    [Fact]
+    public void Bang_is_not_and_functio_abbreviation()
+    {
+        const string src = """
+            FUNCTIO Foo(a, b)
+                IF a > 0 THEN
+                    RETURN !EOF()
+                ENDIF
+            ENDFUNC
+            """;
+        var r = Assert.Single(VfpParser.Parse(src, "f.prg").Routines);
+        Assert.Equal("Foo", r.Name);
+        Assert.Equal(new[] { "a", "b" }, r.Parameters);
+        var iff = Assert.Single(r.Body);
+        Assert.Equal("if", iff.Kind);
+        Assert.Equal("return", iff.Then![0].Kind);
+        Assert.IsType<UnaryExpr>(iff.Then[0].Expression);
+    }
+
+    [Fact]
+    public void Local_as_and_with_endwith()
+    {
+        const string src = """
+            FUNCTION Pdf
+                LOCAL loReport AS PreviewHelper OF App
+                WITH loReport
+                    .Run()
+                ENDWITH
+                RETURN 1
+            ENDFUNC
+            """;
+        var body = VfpParser.Parse(src, "p.prg").Routines[0].Body;
+        Assert.Contains(body, s => s.Kind == "local");
+        Assert.Contains(body, s => s.Kind == "with");
+    }
+
+    [Fact]
+    public void Word_and_without_dots()
+    {
+        var e = ExpressionParser.Parse("a > 1 AND b = 0");
+        var and = Assert.IsType<BinaryExpr>(e);
+        Assert.Equal("AND", and.Op, ignoreCase: true);
+    }
+
+    [Fact]
+    public void Missing_endfunc_ends_at_next_function_or_eof()
+    {
+        const string src = """
+            FUNCTION A
+                RETURN 1
+            FUNCTION B
+                RETURN 2
+            """;
+        var program = VfpParser.Parse(src, "e.prg");
+        Assert.Equal(2, program.Routines.Count);
+        Assert.Equal("A", program.Routines[0].Name);
+        Assert.Equal("B", program.Routines[1].Name);
+    }
 }

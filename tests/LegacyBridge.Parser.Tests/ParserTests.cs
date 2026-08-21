@@ -110,10 +110,11 @@ public class ParserTests
     }
 
     [Fact]
-    public void Throws_on_missing_endproc()
+    public void Missing_endproc_is_implicit_end()
     {
-        Assert.Throws<ParserException>(() =>
-            VfpParser.Parse("PROCEDURE Broken\n  x = 1", "broken.prg"));
+        var r = Assert.Single(VfpParser.Parse("PROCEDURE Broken\n  x = 1", "broken.prg").Routines);
+        Assert.Equal("Broken", r.Name);
+        Assert.Equal("assign", Assert.Single(r.Body).Kind);
     }
 
     [Fact]
