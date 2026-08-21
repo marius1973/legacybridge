@@ -4,7 +4,7 @@
 >
 > Also available as a CLI, a web dashboard, and an **MCP server** for AI coding agents.
 
-![CI](https://github.com/mariomanrique/legacybridge/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/marius1973/legacybridge/actions/workflows/ci.yml/badge.svg)
 ![Coverage](https://img.shields.io/badge/coverage-80%25%2B-brightgreen)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![MCP](https://img.shields.io/badge/MCP-server-blueviolet)
@@ -57,7 +57,7 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
 ## Quickstart (2 minutes)
 
 ```bash
-git clone https://github.com/mariomanrique/legacybridge.git
+git clone https://github.com/marius1973/legacybridge.git
 cd legacybridge
 
 # Analyze the bundled VFP sample and emit its IR
