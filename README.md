@@ -81,27 +81,35 @@ dotnet run --project src/LegacyBridge.Cli -- verify samples/vfp-inventory/legacy
 | Generated code compiling without manual edits | **100%** on `inv_calc` *(CI, 1 compile attempt)* |
 | Compile-fix loop iterations (`inv_calc`) | **0** — method bodies come from the IR AST, not an LLM |
 | Migration time (sample) | minutes vs. ~40 h manual estimate |
-| Eval cases in CI | extract R≥0.8 · generate compiles · verify ≥90% — `evals/thresholds.json` |
+| Eval cases in CI | extract R≥0.8 · generate compiles · verify ≥90% · MCP `--self-test` |
 
 *Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence (or extractor recall) below the threshold.*
 
 ## Use it from an AI agent (MCP)
 
-LegacyBridge exposes its pipeline as an [MCP](https://modelcontextprotocol.io) server, so agents like Claude Code can migrate legacy code as a tool call.
+LegacyBridge exposes the pipeline as an [MCP](https://modelcontextprotocol.io) server (stdio). After `npm install --prefix src/agents`, point the host at the repo root `.mcp.json`:
 
-```jsonc
-// .mcp.json (available from v0.5)
+```json
 {
   "mcpServers": {
     "legacybridge": {
       "command": "node",
-      "args": ["src/agents/mcp-server/dist/index.js"]
+      "args": [
+        "src/agents/node_modules/tsx/dist/cli.mjs",
+        "src/agents/mcp-server/index.ts"
+      ]
     }
   }
 }
 ```
 
-Tools exposed: `analyze_legacy` · `generate_dotnet` · `run_equivalence`
+| Tool | What it does |
+|---|---|
+| `analyze_legacy` | Parse `.prg` → IR summary (routines, parameters, statement counts) |
+| `generate_dotnet` | Emit .NET 8 DDD solution and `dotnet build` |
+| `run_equivalence` | IR oracle vs migrated .NET → match rate |
+
+Ask the agent: *migrate `samples/vfp-inventory/legacy` with LegacyBridge*. It should call the three tools in order. Smoke test without a host: `npx tsx mcp-server/index.ts --self-test` from `src/agents`.
 
 ## Supported language subset (honest scope)
 
@@ -131,7 +139,7 @@ src/
   LegacyBridge.Cli/       `legacybridge analyze|extract|generate|verify`
   LegacyBridge.Generator/ IR AST → .NET 8 DDD solution
   LegacyBridge.Equivalence/ IR oracle vs migrated .NET
-  agents/                 TypeScript extractor (LLM optional; Ollama = $0)
+  agents/                 extractor + MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
   dashboard/              (v0.6+) Next.js progress + equivalence dashboard
 evals/                    CI thresholds (recall, compile, equivalence)
 samples/
@@ -151,7 +159,7 @@ docs/                     architecture, migration guide, demo assets
 - [x] **v0.2** — expression AST, coverage/`--strict`, CLI `extract` + eval (PowerBuilder subset still open)
 - [x] **v0.3** — .NET 8 generator (DDD + EF Core) from IR AST; `samples/vfp-inventory/migrated/` compiles
 - [x] **v0.4** — equivalence tester + eval suite in CI
-- [ ] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
+- [x] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
 - [ ] **v0.6** — Next.js dashboard, PowerBuilder sample case
 - [ ] **v1.0** — second real-world case, launch write-up
 

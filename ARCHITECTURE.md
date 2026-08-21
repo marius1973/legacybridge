@@ -13,18 +13,18 @@ Why:
 2. **Testability** — the parser is plain C# with unit tests; no model drift.
 3. **Portability** — one IR serves both VFP and PowerBuilder frontends.
 
-## Modules (v0.4 status)
+## Modules (v0.5 status)
 
 | Module | Path | Status |
 |---|---|---|
 | VFP lexer | `src/LegacyBridge.Parser/Lexing/` | ✅ |
 | VFP parser → IR | `src/LegacyBridge.Parser/Parsing/` | ✅ |
 | Expression AST | `src/LegacyBridge.Parser/Parsing/ExpressionParser.cs` | ✅ |
-| CLI `analyze` / `extract` / `generate` | `src/LegacyBridge.Cli/` | ✅ |
+| CLI `analyze` / `extract` / `generate` / `verify` | `src/LegacyBridge.Cli/` | ✅ |
 | Business Spec extractor (Agent 1) | `src/agents/` | ✅ |
 | .NET generator (Agent 2) | `src/LegacyBridge.Generator/` | ✅ |
 | Equivalence tester (Agent 3) | `src/LegacyBridge.Equivalence/` | ✅ |
-| MCP server | `src/agents/mcp-server/` | v0.5 |
+| MCP server | `src/agents/mcp-server/` | ✅ |
 | Dashboard | `src/dashboard/` | v0.6 |
 
 ## IR shape
@@ -96,3 +96,7 @@ succeeds on attempt 1 (0 retries). Output: `samples/vfp-inventory/migrated/`.
 2. **Migrated `ProductService`** — the generated .NET 8 application.
 
 Cases are a deterministic grid (zeros, negatives, cap-at-50, qty×cost around 10000) plus SCAN fixtures. Embedded SQL (`MonthlyReport`) is skipped, not failed. Threshold: `evals/thresholds.json` → `equivalence: 0.9`. Report: `samples/vfp-inventory/EQUIVALENCE-REPORT.md`.
+
+## MCP server
+
+`src/agents/mcp-server/` is a stdio MCP server (`@modelcontextprotocol/sdk`). Each tool shells out to `legacybridge` (the C# CLI) — no second pipeline. Config: repo-root `.mcp.json`. `--self-test` runs `analyze_legacy` on the bundled sample.

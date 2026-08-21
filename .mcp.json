@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "legacybridge": {
+      "command": "node",
+      "args": [
+        "src/agents/node_modules/tsx/dist/cli.mjs",
+        "src/agents/mcp-server/index.ts"
+      ]
+    }
+  }
+}

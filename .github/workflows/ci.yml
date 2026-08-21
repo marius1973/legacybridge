@@ -82,6 +82,10 @@ jobs:
       - name: Agent tests
         run: npm test --prefix src/agents
 
+      - name: MCP self-test
+        working-directory: src/agents
+        run: npx tsx mcp-server/index.ts --self-test
+
       - name: Extract business spec
         run: dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release -- extract samples/vfp-inventory/legacy --output artifacts/spec.yaml
 
