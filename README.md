@@ -64,13 +64,14 @@ npm install --prefix src/agents
 # Analyze / extract the bundled VFP sample
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
 dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --output spec.yaml
-# Optional LLM pass (Ollama local = $0):
+dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build
+# Optional LLM pass on extract (Ollama local = $0):
 #   OLLAMA_HOST=http://127.0.0.1:11434 LEGACYBRIDGE_LLM=ollama \
 #   dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --llm --output spec.yaml
 
-# (Coming in v0.4 — full pipeline with agents)
-docker compose up
-legacybridge migrate samples/vfp-inventory --verify
+# (Coming in v0.4 — equivalence tests)
+# docker compose up
+# legacybridge migrate samples/vfp-inventory --verify
 ```
 
 ## Results on the bundled sample
@@ -80,13 +81,12 @@ legacybridge migrate samples/vfp-inventory --verify
 | Extractor entities (`inv_calc`) | P=1.00 R=1.00 *(CI)* |
 | Extractor rules (`inv_calc`) | P=1.00 R=1.00 *(CI, threshold R≥0.8)* |
 | Functional equivalence (`samples/vfp-inventory`) | 🎯 target ≥ 90% *(measured in CI from v0.4)* |
-| Generated code compiling without manual edits | 🎯 target ≥ 95% |
+| Generated code compiling without manual edits | **100%** on `inv_calc` *(CI, 1 compile attempt)* |
+| Compile-fix loop iterations (`inv_calc`) | **0** — method bodies come from the IR AST, not an LLM |
 | Migration time (sample) | 🎯 minutes vs. ~40 h manual estimate |
-| Eval cases in CI | extractor eval + parser tests — see `src/agents/` |
+| Eval cases in CI | extractor eval + parser/generator tests + `dotnet build` on `migrated/` |
 
 *Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence (or extractor recall) below the threshold.*
-
-*Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence below the threshold.*
 
 ## Use it from an AI agent (MCP)
 
@@ -119,7 +119,7 @@ Current parser coverage (v0.2):
 | `SCAN / ENDSCAN`, `DO WHILE / ENDDO` | ✅ | 🔜 |
 | Expressions (typed AST) | ✅ | 🔜 |
 | Embedded SQL (`SELECT/INSERT/UPDATE/DELETE`) | raw capture | 🔜 |
-| Forms (`.scx`) / DataWindows | 🔜 v0.3 | 🔜 v0.3 |
+| Forms (`.scx`) / DataWindows | 🔜 v0.6 | 🔜 v0.6 |
 
 A small, well-tested subset beats a broad, fragile one. Expressions are a typed AST
 (`literal` / `identifier` / `unary` / `binary` / `call`); `RawText` is kept on each node.
@@ -131,7 +131,8 @@ Parser line coverage is **99%** (coverlet); CI fails the build below 80%.
 ```
 src/
   LegacyBridge.Parser/    C# lexer + parser → unified IR (JSON)
-  LegacyBridge.Cli/       `legacybridge analyze|extract`
+  LegacyBridge.Cli/       `legacybridge analyze|extract|generate`
+  LegacyBridge.Generator/ IR AST → .NET 8 DDD solution (no Scriban)
   agents/                 TypeScript extractor (LLM optional; Ollama = $0)
   dashboard/              (v0.6+) Next.js progress + equivalence dashboard
 evals/                    (v0.4+) datasets, CI-published reports
@@ -150,7 +151,7 @@ docs/                     architecture, migration guide, demo assets
 
 - [x] **v0.1** — VFP lexer/parser → IR, CLI `analyze`, CI + tests
 - [x] **v0.2** — expression AST, coverage/`--strict`, CLI `extract` + eval (PowerBuilder subset still open)
-- [ ] **v0.3** — .NET 8 generator (DDD + EF Core) from Business Spec
+- [x] **v0.3** — .NET 8 generator (DDD + EF Core) from IR AST; `samples/vfp-inventory/migrated/` compiles
 - [ ] **v0.4** — equivalence tester + eval suite in CI
 - [ ] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
 - [ ] **v0.6** — Next.js dashboard, PowerBuilder sample case

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LegacyBridge.Generator;
 using LegacyBridge.Parser.Ir;
 using LegacyBridge.Parser.Lexing;
 using LegacyBridge.Parser.Parsing;
@@ -8,11 +9,11 @@ return Cli.Run(args);
 internal static class Cli
 {
     private const string Usage =
-        "usage:\n  legacybridge analyze <path> [--output ir.json] [--strict]\n  legacybridge extract <path> [--output spec.yaml] [--strict] [--llm]";
+        "usage:\n  legacybridge analyze <path> [--output ir.json] [--strict]\n  legacybridge extract <path> [--output spec.yaml] [--strict] [--llm]\n  legacybridge generate <path> [--output dir] [--strict] [--build]";
 
     public static int Run(string[] args)
     {
-        if (args.Length < 2 || args[0] is not ("analyze" or "extract"))
+        if (args.Length < 2 || args[0] is not ("analyze" or "extract" or "generate"))
         {
             Console.Error.WriteLine(Usage);
             return 2;
@@ -21,12 +22,14 @@ internal static class Cli
         var cmd = args[0];
         var strict = false;
         var llm = false;
+        var build = false;
         string? path = null;
         string? outputPath = null;
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--strict") { strict = true; continue; }
             if (args[i] == "--llm") { llm = true; continue; }
+            if (args[i] == "--build") { build = true; continue; }
             if (args[i] == "--output")
             {
                 if (i + 1 >= args.Length)
@@ -66,6 +69,9 @@ internal static class Cli
             return 0;
         }
 
+        if (cmd == "generate")
+            return Generate(programs, outputPath ?? "generated", build);
+
         return Extract(programs, outputPath, llm);
     }
 
@@ -92,6 +98,18 @@ internal static class Cli
         if (dir is not null) Directory.CreateDirectory(dir);
         File.WriteAllText(outputPath, json);
         Console.WriteLine($"IR written to {outputPath}");
+    }
+
+    private static int Generate(List<IrProgram> programs, string outputDir, bool build)
+    {
+        var result = SolutionGenerator.Write(programs, outputDir);
+        Console.WriteLine($"generated {result.Files.Count} files → {result.SlnPath}");
+        if (!build)
+            return 0;
+        var (ok, log, attempts) = SolutionGenerator.Build(result.SlnPath);
+        Console.WriteLine($"build {(ok ? "ok" : "FAIL")} in {attempts} attempt(s)");
+        if (!ok) Console.Error.Write(log);
+        return ok ? 0 : 1;
     }
 
     private static int Extract(List<IrProgram> programs, string? outputPath, bool llm)
