@@ -13,7 +13,7 @@ Why:
 2. **Testability** — the parser is plain C# with unit tests; no model drift.
 3. **Portability** — one IR serves both VFP and PowerBuilder frontends.
 
-## Modules (v0.5 status)
+## Modules (v0.6 status)
 
 | Module | Path | Status |
 |---|---|---|
@@ -25,7 +25,7 @@ Why:
 | .NET generator (Agent 2) | `src/LegacyBridge.Generator/` | ✅ |
 | Equivalence tester (Agent 3) | `src/LegacyBridge.Equivalence/` | ✅ |
 | MCP server | `src/agents/mcp-server/` | ✅ |
-| Dashboard | `src/dashboard/` | v0.6 |
+| Dashboard | `src/dashboard/` | ✅ |
 
 ## IR shape
 
@@ -100,3 +100,7 @@ Cases are a deterministic grid (zeros, negatives, cap-at-50, qty×cost around 10
 ## MCP server
 
 `src/agents/mcp-server/` is a stdio MCP server (`@modelcontextprotocol/sdk`). Each tool shells out to `legacybridge` (the C# CLI) — no second pipeline. Config: repo-root `.mcp.json`. `--self-test` runs `analyze_legacy` on the bundled sample.
+
+## Dashboard
+
+`src/dashboard/` (Next.js) shows the committed equivalence table on load and can re-run the CLI pipeline over SSE (`POST /api/run`). `docker compose up --build` serves it at http://localhost:3000. No Postgres/Langfuse — the sample demo does not need them.

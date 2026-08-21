@@ -8,6 +8,7 @@ generated/
 .vscode/
 node_modules/
 dist/
+.next/
 .env
 *.trx
 TestResults/

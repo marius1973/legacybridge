@@ -10,8 +10,7 @@
 ![MCP](https://img.shields.io/badge/MCP-server-blueviolet)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-<!-- TODO: add a 30-second demo.gif here — it is the single most-viewed asset in this repo -->
-<!-- ![Demo](docs/demo.gif) -->
+![Demo](docs/legacybridge-mcp.gif)
 
 ---
 
@@ -59,16 +58,21 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
 ```bash
 git clone https://github.com/marius1973/legacybridge.git
 cd legacybridge
-npm install --prefix src/agents
+docker compose up --build
+# open http://localhost:3000 — Run bundled sample
+```
 
-# Analyze / extract the bundled VFP sample
+Without Docker:
+
+```bash
+npm install --prefix src/agents
+npm install --prefix src/dashboard
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
 dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --output spec.yaml
 dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build
 dotnet run --project src/LegacyBridge.Cli -- verify samples/vfp-inventory/legacy --output samples/vfp-inventory/EQUIVALENCE-REPORT.md
-# Optional LLM pass on extract (Ollama local = $0):
-#   OLLAMA_HOST=http://127.0.0.1:11434 LEGACYBRIDGE_LLM=ollama \
-#   dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --llm --output spec.yaml
+npm run dev --prefix src/dashboard
+# http://localhost:3000
 ```
 
 ## Results on the bundled sample
@@ -86,6 +90,10 @@ dotnet run --project src/LegacyBridge.Cli -- verify samples/vfp-inventory/legacy
 *Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence (or extractor recall) below the threshold.*
 
 ## Use it from an AI agent (MCP)
+
+![Claude Code migrating the bundled VFP sample through the LegacyBridge MCP server](docs/legacybridge-mcp.gif)
+
+*Real session: Claude Code calls `analyze_legacy`, `generate_dotnet` and `run_equivalence` over stdio. The generated solution builds on the first attempt.*
 
 LegacyBridge exposes the pipeline as an [MCP](https://modelcontextprotocol.io) server (stdio). After `npm install --prefix src/agents`, point the host at the repo root `.mcp.json`:
 
@@ -140,7 +148,7 @@ src/
   LegacyBridge.Generator/ IR AST → .NET 8 DDD solution
   LegacyBridge.Equivalence/ IR oracle vs migrated .NET
   agents/                 extractor + MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
-  dashboard/              (v0.6+) Next.js progress + equivalence dashboard
+  dashboard/              Next.js UI: pipeline steps + equivalence table
 evals/                    CI thresholds (recall, compile, equivalence)
 samples/
   vfp-inventory/          legacy → migrated → EQUIVALENCE-REPORT.md
@@ -160,8 +168,8 @@ docs/                     architecture, migration guide, demo assets
 - [x] **v0.3** — .NET 8 generator (DDD + EF Core) from IR AST; `samples/vfp-inventory/migrated/` compiles
 - [x] **v0.4** — equivalence tester + eval suite in CI
 - [x] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
-- [ ] **v0.6** — Next.js dashboard, PowerBuilder sample case
-- [ ] **v1.0** — second real-world case, launch write-up
+- [x] **v0.6** — Next.js dashboard (`docker compose up` → localhost:3000)
+- [ ] **v1.0** — PowerBuilder sample + launch write-up
 
 ## Contributing
 

@@ -1,20 +1,8 @@
-# v0.1: infrastructure for later phases.
-# The parser + CLI run without any containers.
+# Dashboard + CLI. Postgres/Langfuse are not required for the sample demo.
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: legacybridge
-      POSTGRES_PASSWORD: legacybridge
-      POSTGRES_DB: legacybridge
+  dashboard:
+    build: .
     ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-  # v0.4+ : langfuse (LLM observability / eval tracing)
-  # v0.5+ : mcp-server (TypeScript)
-  # v0.6+ : dashboard (Next.js)
-
-volumes:
-  pgdata:
+      - "3000:3000"
+    environment:
+      REPO_ROOT: /app

@@ -1,0 +1,9 @@
+.git
+**/.next
+**/node_modules
+**/bin
+**/obj
+artifacts
+generated
+**/*.user
+.vs
