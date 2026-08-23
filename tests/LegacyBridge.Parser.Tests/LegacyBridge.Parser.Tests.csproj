@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <None Include="..\..\samples\vfp-inventory\legacy\inv_calc.prg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\pb-billing\legacy\n_billing.sru" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

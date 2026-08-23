@@ -10,17 +10,17 @@ export function createServer(): McpServer {
   server.registerTool(
     "analyze_legacy",
     {
-      description: "Parse Visual FoxPro (.prg) source into a summarized IR (routine names, parameters, statement counts).",
-      inputSchema: { path: z.string().describe("File or directory of .prg files") },
+      description: "Parse Visual FoxPro (.prg) or PowerBuilder (.sru/.srd) source into a summarized IR (routine names, parameters, statement counts).",
+      inputSchema: { path: z.string().describe("File or directory of .prg / .sru / .srd files") },
     },
     async ({ path }) => text(await analyzeLegacy(path)),
   );
   server.registerTool(
     "generate_dotnet",
     {
-      description: "Generate a compiling .NET 8 Clean Architecture solution from VFP source.",
+      description: "Generate a compiling .NET 8 Clean Architecture solution from VFP or PowerBuilder source.",
       inputSchema: {
-        path: z.string().describe("File or directory of .prg files"),
+        path: z.string().describe("File or directory of .prg / .sru / .srd files"),
         output: z.string().optional().describe("Output directory (default generated/mcp)"),
       },
     },
@@ -30,7 +30,7 @@ export function createServer(): McpServer {
     "run_equivalence",
     {
       description: "Run IR oracle vs migrated .NET and return the equivalence rate plus report header.",
-      inputSchema: { path: z.string().describe("File or directory of .prg files") },
+      inputSchema: { path: z.string().describe("File or directory of .prg / .sru / .srd files") },
     },
     async ({ path }) => text(await runEquivalence(path)),
   );

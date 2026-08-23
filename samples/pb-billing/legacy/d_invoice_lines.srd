@@ -1,0 +1,7 @@
+$PBExportHeader$d_invoice_lines.srd
+release 12;
+datawindow(units=0 timer_interval=0 color=1073741824 processing=0)
+table(column=(type=decimal updatewhereclause=yes name=qty dbname="qty")
+ column=(type=decimal updatewhereclause=yes name=unit_cost dbname="unit_cost")
+ retrieve="SELECT qty, unit_cost FROM invoice_lines WHERE billed = 1"
+ )

@@ -91,13 +91,14 @@ internal static class Cli
 
     private static List<IrProgram> ParseAll(string path, bool strict)
     {
-        var files = Directory.Exists(path)
-            ? Directory.GetFiles(path, "*.prg", SearchOption.AllDirectories)
-            : new[] { path };
-        var programs = new List<IrProgram>();
-        foreach (var file in files)
-            programs.Add(VfpParser.Parse(File.ReadAllText(file), Path.GetFileName(file), strict));
-        return programs;
+        IEnumerable<string> files = Directory.Exists(path)
+            ? Directory.GetFiles(path, "*.*", SearchOption.AllDirectories)
+                .Where(SourceParser.IsLegacySource)
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            : [path];
+        return files
+            .Select(file => SourceParser.Parse(File.ReadAllText(file), Path.GetFileName(file), strict))
+            .ToList();
     }
 
     private static void WriteOutput(List<IrProgram> programs, string? outputPath)

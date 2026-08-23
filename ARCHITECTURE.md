@@ -13,12 +13,13 @@ Why:
 2. **Testability** — the parser is plain C# with unit tests; no model drift.
 3. **Portability** — one IR serves both VFP and PowerBuilder frontends.
 
-## Modules (v0.6 status)
+## Modules (v0.7 status)
 
 | Module | Path | Status |
 |---|---|---|
 | VFP lexer | `src/LegacyBridge.Parser/Lexing/` | ✅ |
 | VFP parser → IR | `src/LegacyBridge.Parser/Parsing/` | ✅ |
+| PowerBuilder frontend | `src/LegacyBridge.Parser/Parsing/PbParser.cs` | ✅ subset (normalize → VFP parser; `.srd` retrieve SQL) |
 | Expression AST | `src/LegacyBridge.Parser/Parsing/ExpressionParser.cs` | ✅ |
 | CLI `analyze` / `extract` / `generate` / `verify` | `src/LegacyBridge.Cli/` | ✅ |
 | Business Spec extractor (Agent 1) | `src/agents/` | ✅ |

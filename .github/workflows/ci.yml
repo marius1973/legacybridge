@@ -69,6 +69,9 @@ jobs:
       - name: Smoke test — parse the bundled VFP sample
         run: dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release -- analyze samples/vfp-inventory/legacy --output artifacts/ir.json
 
+      - name: Smoke test — parse the PowerBuilder sample
+        run: dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release -- analyze samples/pb-billing/legacy --output artifacts/ir-pb.json
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
@@ -119,5 +122,6 @@ jobs:
           name: sample-ir
           path: |
             artifacts/ir.json
+            artifacts/ir-pb.json
             artifacts/spec.yaml
             artifacts/EQUIVALENCE-REPORT.md

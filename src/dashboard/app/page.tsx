@@ -62,14 +62,14 @@ export default function Page() {
   return (
     <main>
       <h1>LegacyBridge</h1>
-      <p className="sub">VFP → .NET 8. Same cases on the IR oracle and the generated code.</p>
+      <p className="sub">VFP / PowerBuilder → .NET 8. Same cases on the IR oracle and the generated code.</p>
       <div className="row">
         <button type="button" disabled={busy} onClick={run}>
           {busy ? "Running…" : file ? `Migrate ${file.name}` : "Run bundled sample"}
         </button>
         <label className="file">
-          <input type="file" accept=".prg,.txt" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          {file ? file.name : "or upload .prg"}
+          <input type="file" accept=".prg,.sru,.srd,.txt" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          {file ? file.name : "or upload .prg / .sru"}
         </label>
       </div>
       <div className="steps">

@@ -68,6 +68,7 @@ Without Docker:
 npm install --prefix src/agents
 npm install --prefix src/dashboard
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
+dotnet run --project src/LegacyBridge.Cli -- analyze samples/pb-billing/legacy --output ir-pb.json
 dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --output spec.yaml
 dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build
 dotnet run --project src/LegacyBridge.Cli -- verify samples/vfp-inventory/legacy --output samples/vfp-inventory/EQUIVALENCE-REPORT.md
@@ -82,6 +83,7 @@ npm run dev --prefix src/dashboard
 | Extractor entities (`inv_calc`) | P=1.00 R=1.00 *(CI)* |
 | Extractor rules (`inv_calc`) | P=1.00 R=1.00 *(CI, threshold R≥0.8)* |
 | Functional equivalence (`inv_calc`) | **100%** (111/111, 1 SQL skipped) *(CI, threshold ≥90%)* |
+| PowerBuilder NVO (`n_billing.sru`) vs same oracle | **100%** (108/108, 1 SQL skipped) |
 | Generated code compiling without manual edits | **100%** on `inv_calc` *(CI, 1 compile attempt)* |
 | Compile-fix loop iterations (`inv_calc`) | **0** — method bodies come from the IR AST, not an LLM |
 | Migration time (sample) | minutes vs. ~40 h manual estimate |
@@ -113,7 +115,7 @@ LegacyBridge exposes the pipeline as an [MCP](https://modelcontextprotocol.io) s
 
 | Tool | What it does |
 |---|---|
-| `analyze_legacy` | Parse `.prg` → IR summary (routines, parameters, statement counts) |
+| `analyze_legacy` | Parse `.prg` / `.sru` / `.srd` → IR summary (routines, parameters, statement counts) |
 | `generate_dotnet` | Emit .NET 8 DDD solution and `dotnet build` |
 | `run_equivalence` | IR oracle vs migrated .NET → match rate |
 
@@ -121,18 +123,18 @@ Ask the agent: *migrate `samples/vfp-inventory/legacy` with LegacyBridge*. It sh
 
 ## Supported language subset (honest scope)
 
-Current parser coverage (v0.2):
+Current parser coverage (v0.7):
 
 | Construct | VFP | PowerBuilder |
 |---|---|---|
-| `PROCEDURE` / `FUNCTION`, `LPARAMETERS` / `PARAMETERS` | ✅ | 🔜 |
-| `LOCAL` (including `m.x`) | ✅ | 🔜 |
-| `IF / ELSEIF / ELSE / ENDIF` | ✅ | 🔜 |
-| `FOR ... TO ... STEP / ENDFOR` / `NEXT` | ✅ | 🔜 |
-| `SCAN / ENDSCAN`, `DO WHILE / ENDDO` | ✅ | 🔜 |
-| Expressions (typed AST) | ✅ | 🔜 |
-| Embedded SQL (`SELECT/INSERT/UPDATE/DELETE`) | raw capture | 🔜 |
-| Forms (`.scx`) / DataWindows | 🔜 v0.6 | 🔜 v0.6 |
+| `PROCEDURE` / `FUNCTION`, `LPARAMETERS` / `PARAMETERS` | ✅ | ✅ `function` / `subroutine` + typed args |
+| `LOCAL` (including `m.x`) | ✅ | ✅ typed locals (`decimal ld_x`) |
+| `IF / ELSEIF / ELSE / ENDIF` | ✅ | ✅ `if … then` / `end if` |
+| `FOR ... TO ... STEP / ENDFOR` / `NEXT` | ✅ | ✅ `end for` |
+| `SCAN / ENDSCAN`, `DO WHILE / ENDDO` | ✅ | 🔜 SCAN · ✅ `do while` / `loop` |
+| Expressions (typed AST) | ✅ | ✅ same AST |
+| Embedded SQL (`SELECT/INSERT/UPDATE/DELETE`) | raw capture | raw capture |
+| Forms (`.scx`) / DataWindows | 🔜 | retrieve SQL only (`.srd`) |
 
 A small, well-tested subset beats a broad, fragile one. Expressions are a typed AST
 (`literal` / `identifier` / `unary` / `binary` / `call`); `RawText` is kept on each node.
@@ -152,6 +154,7 @@ src/
 evals/                    CI thresholds (recall, compile, equivalence)
 samples/
   vfp-inventory/          legacy → migrated → EQUIVALENCE-REPORT.md
+  pb-billing/             PowerBuilder NVO + DataWindow retrieve → same IR
 docs/                     architecture, migration guide, demo assets
 ```
 
@@ -164,12 +167,13 @@ docs/                     architecture, migration guide, demo assets
 ## Roadmap
 
 - [x] **v0.1** — VFP lexer/parser → IR, CLI `analyze`, CI + tests
-- [x] **v0.2** — expression AST, coverage/`--strict`, CLI `extract` + eval (PowerBuilder subset still open)
+- [x] **v0.2** — expression AST, coverage/`--strict`, CLI `extract` + eval
 - [x] **v0.3** — .NET 8 generator (DDD + EF Core) from IR AST; `samples/vfp-inventory/migrated/` compiles
 - [x] **v0.4** — equivalence tester + eval suite in CI
 - [x] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
 - [x] **v0.6** — Next.js dashboard (`docker compose up` → localhost:3000)
-- [ ] **v1.0** — PowerBuilder sample + launch write-up
+- [x] **v0.7** — PowerBuilder frontend (`samples/pb-billing`) → same IR
+- [ ] **v1.0** — launch write-up
 
 ## Contributing
 
