@@ -117,4 +117,4 @@ both wrong and still report 100%. Mitigation: `evals/golden-cases.json`
 
 ## Dashboard
 
-`src/dashboard/` (Next.js) shows the committed equivalence table on load and can re-run the CLI pipeline over SSE (`POST /api/run`). `docker compose up --build` serves it at http://localhost:3000. No Postgres/Langfuse — the sample demo does not need them.
+`src/dashboard/` (Next.js) shows committed sample metrics on load (100% · 148/148 · 99% coverage), re-runs the CLI over SSE, and stacks the equivalence table as cards under 700px. `docker compose up --build` serves it at http://localhost:3000.

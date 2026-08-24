@@ -34,22 +34,22 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
 └─────────┬─────────┘
           ▼
 ┌───────────────────┐   Agent 1: maps entities, rules, flows, embedded SQL
-│  Business Spec    │   → versioned YAML business specification
-│  Extractor (LLM)  │
+│  Business Spec    │   → YAML from the IR (deterministic; `--llm` optional)
+│  Extractor        │
 └─────────┬─────────┘
           ▼
-┌───────────────────┐   Agent 2: .NET 8 solution — Domain / Application /
-│  .NET Generator   │   Infrastructure layers, EF Core, DDD patterns
-│  (LLM + templates)│
+┌───────────────────┐   Agent 2: .NET 8 Domain / Application / Infrastructure /
+│  .NET Generator   │   Api from C# templates + `--spec` (no LLM in CI)
+│  (templates)      │
 └─────────┬─────────┘
           ▼
-┌───────────────────┐   Agent 3: generates test cases, runs BOTH versions
-│ Equivalence Tester│   (legacy vs. .NET) on the same data, diffs outputs
-│        ⭐         │   → equivalence report with % functional match
+┌───────────────────┐   Agent 3: same cases on the IR oracle and migrated .NET
+│ Equivalence Tester│   CFG thresholds + goldens → match % (SQL skipped, not failed)
+│        ⭐         │
 └─────────┬─────────┘
           ▼
-┌───────────────────┐   eval suite in CI: extraction recall, compile, equivalence
-│  Evals            │   thresholds in evals/thresholds.json — build fails if they drop
+┌───────────────────┐   CI: extract recall, generate compiles, verify ≥90%, goldens
+│  Evals            │   evals/thresholds.json + golden-cases.json — build fails if they drop
 └───────────────────┘
 ```
 
@@ -59,7 +59,7 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
 git clone https://github.com/marius1973/legacybridge.git
 cd legacybridge
 docker compose up --build
-# open http://localhost:3000 — Run bundled sample
+# open http://localhost:3000 — hero 100% · 148/148 · 99%; Run bundled sample
 ```
 
 Without Docker:
@@ -83,11 +83,11 @@ npm run dev --prefix src/dashboard
 | Extractor entities (`inv_calc`) | P=1.00 R=1.00 *(CI)* |
 | Extractor rules (`inv_calc`) | P=1.00 R=1.00 *(CI, threshold R≥0.8)* |
 | Functional equivalence (`inv_calc`) | **100%** (148/148, 1 SQL skipped) *(CI, threshold ≥90%)* |
-| PowerBuilder NVO (`n_billing.sru`) vs same oracle | **100%** (108/108, 1 SQL skipped) |
+| PowerBuilder NVO (`n_billing.sru`) vs same oracle | **100%** (145/145, 1 SQL skipped) |
 | Generated code compiling without manual edits | **100%** on `inv_calc` *(CI, 1 compile attempt)* |
 | Compile-fix loop iterations (`inv_calc`) | **0** — method bodies come from the IR AST, not an LLM |
 | Migration time (sample) | minutes vs. ~40 h manual estimate |
-| Eval cases in CI | extract R≥0.8 · generate compiles · verify ≥90% · MCP `--self-test` |
+| Eval cases in CI | extract R≥0.8 · generate compiles · verify ≥90% (VFP + PB) · goldens · MCP `--self-test` |
 
 *Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence (or extractor recall) below the threshold.*
 
@@ -123,7 +123,7 @@ Ask the agent: *migrate `samples/vfp-inventory/legacy` with LegacyBridge*. It sh
 
 ## Supported language subset (honest scope)
 
-Current parser coverage (v0.7):
+Current parser coverage (v0.9):
 
 | Construct | VFP | PowerBuilder |
 |---|---|---|
@@ -151,11 +151,11 @@ src/
   LegacyBridge.Generator/ IR AST → .NET 8 DDD solution
   LegacyBridge.Equivalence/ IR oracle vs migrated .NET
   agents/                 extractor + MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
-  dashboard/              Next.js UI: pipeline steps + equivalence table
-evals/                    CI thresholds (recall, compile, equivalence)
+  dashboard/              Next.js: hero metrics, ES/EN, GitHub, pipeline + table
+evals/                    thresholds.json + golden-cases.json
 samples/
   vfp-inventory/          legacy → migrated → EQUIVALENCE-REPORT.md
-  pb-billing/             PowerBuilder NVO + DataWindow retrieve → same IR
+  pb-billing/             PowerBuilder NVO + DataWindow → migrated/ + EQUIVALENCE-REPORT.md
 docs/                     architecture, migration guide, demo assets, walkthrough.md
 ```
 
@@ -165,7 +165,7 @@ docs/                     architecture, migration guide, demo assets, walkthroug
 - **Why does generate take `--spec`?** Agent 1's YAML is what names entities and fields. Without it the generator falls back to IR heuristics. The spec is not a side document.
 - **Why golden cases besides 100% equivalence?** Interpreter and emitter share the IR. Hand-computed `evals/golden-cases.json` checks the oracle independently. Those same numbers become generated xUnit tests.
 - **Why equivalence tests instead of snapshots?** Snapshot tests freeze behavior you don't understand. Equivalence tests run the legacy binary semantics against the new domain code on the *same* dataset — that is the property a business actually pays for.
-- **Why evals in CI?** An LLM pipeline without evals is a demo. Every prompt/model change is gated on extraction precision and functional-equivalence thresholds.
+- **Why evals in CI?** The default path has no API key. Every parser/extractor/generator change is gated on extraction recall, compile, goldens, and functional-equivalence thresholds.
 
 ## Roadmap
 
@@ -177,6 +177,7 @@ docs/                     architecture, migration guide, demo assets, walkthroug
 - [x] **v0.6** — Next.js dashboard (`docker compose up` → localhost:3000)
 - [x] **v0.7** — PowerBuilder frontend (`samples/pb-billing`) → same IR
 - [x] **v0.8** — `generate --spec`, CFG cases, golden oracle, string ops, generated xUnit
+- [x] **v0.9** — dashboard UX: hero metrics, mobile cards, step detail, sample source
 - [ ] **v1.0** — launch write-up
 
 ## Contributing

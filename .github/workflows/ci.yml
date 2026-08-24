@@ -113,11 +113,21 @@ jobs:
       - name: Build committed migrated sample
         run: dotnet build samples/vfp-inventory/migrated/VfpInventory.sln --nologo
 
+      - name: Build committed PowerBuilder migrated sample
+        run: dotnet build samples/pb-billing/migrated/VfpInventory.sln --nologo
+
       - name: Equivalence ≥ 90%
         run: >
           dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release --
           verify samples/vfp-inventory/legacy
           --output artifacts/EQUIVALENCE-REPORT.md
+          --min-match 0.9
+
+      - name: Equivalence PowerBuilder ≥ 90%
+        run: >
+          dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release --
+          verify samples/pb-billing/legacy/n_billing.sru
+          --output artifacts/EQUIVALENCE-REPORT-pb.md
           --min-match 0.9
 
       - name: Upload IR artifact
@@ -129,3 +139,4 @@ jobs:
             artifacts/ir-pb.json
             artifacts/spec.yaml
             artifacts/EQUIVALENCE-REPORT.md
+            artifacts/EQUIVALENCE-REPORT-pb.md

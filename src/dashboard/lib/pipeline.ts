@@ -66,6 +66,35 @@ export function sampleReport(cwd = repoRoot()): string {
   return readFileSync(join(cwd, "samples", "vfp-inventory", "EQUIVALENCE-REPORT.md"), "utf8");
 }
 
+export function sampleSource(cwd = repoRoot()): { name: string; text: string } {
+  const name = "inv_calc.prg";
+  return { name, text: readFileSync(join(cwd, "samples", "vfp-inventory", "legacy", name), "utf8") };
+}
+
+function stepDetail(name: string, stdout: string, work: string): string {
+  const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+  if (name === "analyze") {
+    const parsed = lines.filter((l) => l.startsWith("parsed "));
+    if (parsed.length) return parsed.join(" · ");
+  }
+  if (name === "extract") {
+    try {
+      const y = readFileSync(join(work, "spec.yaml"), "utf8");
+      const block = (key: string) => {
+        const start = y.search(new RegExp(`^${key}:`, "m"));
+        if (start < 0) return "";
+        const rest = y.slice(start);
+        const next = rest.slice(key.length + 1).search(/^[a-z]+:/m);
+        return next < 0 ? rest : rest.slice(0, key.length + 1 + next);
+      };
+      const entities = block("entities").match(/^\s+- name:/gm)?.length ?? 0;
+      const rules = block("rules").match(/^\s+- id:/gm)?.length ?? 0;
+      return `${entities} entities, ${rules} rules`;
+    } catch { /* last line */ }
+  }
+  return lines.at(-1) ?? "";
+}
+
 export async function runPipeline(
   onStep: (step: string, status: "running" | "ok" | "fail", detail?: string) => void,
   sourcePath?: string,
@@ -86,7 +115,7 @@ export async function runPipeline(
       onStep(name, "fail", (r.stderr || r.stdout).slice(-1500));
       return { ok: false, report: r.stderr || r.stdout };
     }
-    onStep(name, "ok", r.stdout.trim().split(/\r?\n/).pop());
+      onStep(name, "ok", stepDetail(name, r.stdout, work));
   }
   return { ok: true, report: readFileSync(join(work, "EQUIVALENCE-REPORT.md"), "utf8") };
 }

@@ -16,27 +16,68 @@ main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
 h1 { font-size: 1.6rem; margin: 0 0 6px; }
 .sub { color: var(--muted); margin: 0 0 16px; }
 .head .sub { margin: 0; }
-.lang { display: flex; gap: 4px; flex-shrink: 0; }
-.lang button {
+.tools { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+.lang { display: flex; gap: 4px; }
+.lang button, .gh {
   background: var(--panel); color: var(--muted); border: 1px solid var(--line);
   border-radius: 8px; padding: 6px 10px; font-weight: 650; cursor: pointer;
 }
 .lang button.on { background: var(--acc); color: #071018; border-color: var(--acc); }
-.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+.gh { display: inline-flex; align-items: center; color: var(--text); text-decoration: none; }
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.metric {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; text-align: center;
+}
+.metric b { display: block; font-size: 1.7rem; color: var(--ok); }
+.metric span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
 button, .file {
   background: var(--acc); color: #071018; border: 0; border-radius: 8px;
   padding: 8px 14px; font-weight: 650; cursor: pointer;
 }
 button:disabled { opacity: 0.5; cursor: wait; }
 .file { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+.legacy { margin: 0 0 18px; color: var(--muted); }
+.legacy summary { cursor: pointer; }
+.code {
+  background: #0b1016; border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px; overflow: auto; max-height: 280px; color: var(--text); font-size: 12.5px;
+}
+.cmt { color: #6b7c90; }
 .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
 .step { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
 .step b { display: block; text-transform: uppercase; font-size: 11px; letter-spacing: .06em; color: var(--muted); }
 .step span { font-size: 1.05rem; }
-.rate { font-size: 2.4rem; font-weight: 750; margin: 8px 0 16px; }
+.step .detail {
+  display: block; margin-top: 4px; color: var(--muted); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.step .run { color: var(--acc); }
+.rate { font-size: 2.4rem; font-weight: 750; margin: 8px 0 8px; }
+.note { color: var(--muted); font-size: 12px; margin: -8px 0 12px; }
 .ok { color: var(--ok); } .fail { color: var(--fail); } .skip { color: var(--skip); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; }
+.match-cell { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.miss-cell { background: color-mix(in srgb, var(--fail) 16%, transparent); }
 .wrap { overflow: auto; max-height: 480px; border: 1px solid var(--line); border-radius: 10px; }
+.skel { display: grid; gap: 8px; margin-bottom: 16px; }
+.skel div { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--panel), var(--line), var(--panel)); background-size: 200% 100%; animation: shine 1.2s linear infinite; }
+@keyframes shine { to { background-position: -200% 0; } }
 pre { white-space: pre-wrap; color: var(--fail); font-size: 13px; }
+
+@media (max-width: 700px) {
+  .metrics { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  .wrap { max-height: none; }
+  table thead { display: none; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  tr { padding: 10px 8px; border-bottom: 1px solid var(--line); }
+  td { border: 0; padding: 2px 0 2px 38%; position: relative; }
+  td::before {
+    content: attr(data-label); position: absolute; left: 0; width: 36%;
+    color: var(--muted); font-size: 11px; text-transform: uppercase;
+  }
+}

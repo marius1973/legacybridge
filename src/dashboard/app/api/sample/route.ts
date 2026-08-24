@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { parseReport, sampleReport } from "@/lib/pipeline";
+import { parseReport, sampleReport, sampleSource } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
 
 export function GET() {
-  const parsed = parseReport(sampleReport());
-  return NextResponse.json(parsed);
+  const src = sampleSource();
+  return NextResponse.json({ ...parseReport(sampleReport()), source: src.text, sourceName: src.name });
 }
