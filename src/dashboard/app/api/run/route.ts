@@ -22,7 +22,7 @@ export async function POST(req: Request) {
           (step, status, detail) => send({ step, status, detail }),
           source,
         );
-        if (result.ok) send({ report: parseReport(result.report) });
+        if (result.ok) send({ report: parseReport(result.artifacts!.report), artifacts: result.artifacts });
         else send({ error: result.report.slice(-2000) });
       } catch (e) {
         send({ error: e instanceof Error ? e.message : String(e) });

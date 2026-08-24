@@ -13,7 +13,32 @@ Why:
 2. **Testability** — the parser is plain C# with unit tests; no model drift.
 3. **Portability** — one IR serves both VFP and PowerBuilder frontends.
 
-## Modules (v0.7 status)
+## Pipeline
+
+```mermaid
+flowchart TD
+  SRC["VFP / PowerBuilder source"] --> PAR["Parser C#"]
+  PAR --> IR["IR JSON"]
+  IR --> EXT["Extractor"]
+  EXT --> SPEC["business-spec YAML"]
+  IR --> GEN["Generator templates"]
+  SPEC --> GEN
+  GEN --> NET[".NET 8 DDD solution"]
+  IR --> EQ["Equivalence"]
+  NET --> EQ
+  EQ --> REP["EQUIVALENCE-REPORT"]
+  IR --> DASH["Dashboard artifacts"]
+  SPEC --> DASH
+  NET --> DASH
+  REP --> DASH
+  NET --> ZIP["GET /api/download .zip"]
+```
+
+Kept artifacts: JSON, YAML, `.cs`, report, and a downloadable zip (`archiver`).
+`GET /api/download` is the committed sample (instant). `POST` re-runs generate for an upload.
+Temp dirs are deleted after the pipeline / zip stream.
+
+## Modules (v0.9 status)
 
 | Module | Path | Status |
 |---|---|---|
@@ -117,4 +142,10 @@ both wrong and still report 100%. Mitigation: `evals/golden-cases.json`
 
 ## Dashboard
 
-`src/dashboard/` (Next.js) shows committed sample metrics on load (100% · 148/148 · 99% coverage), re-runs the CLI over SSE, and stacks the equivalence table as cards under 700px. `docker compose up --build` serves it at http://localhost:3000.
+`src/dashboard/` (Next.js) shows committed sample metrics on load (100% · 148/148 · 99% coverage),
+the committed `migrated/` tree (`Product.cs` first) and `business-spec.expected.yaml`, then can
+re-run the CLI over SSE. After a run it shows the live IR JSON, extracted spec, and generated `.cs`.
+`GET /api/download` zips the committed `migrated/` with `archiver` (instant). `POST` with a file
+re-runs `extract` + `generate --build --spec` then zips, and deletes the temp dir when the stream ends.
+`runPipeline` also `rmSync`s `lb-dash-` / `lb-up-`. Equivalence table stacks as cards under 700px.
+`docker compose up --build` serves it at http://localhost:3000.

@@ -50,6 +50,11 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
           ▼
 ┌───────────────────┐   CI: extract recall, generate compiles, verify ≥90%, goldens
 │  Evals            │   evals/thresholds.json + golden-cases.json — build fails if they drop
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐   dashboard: IR · spec · .NET files · report
+│  Artifacts        │   button “Download .NET solution”
+│  + /api/download  │   GET zip (sample) · POST generate+zip (upload)
 └───────────────────┘
 ```
 
@@ -59,7 +64,7 @@ VFP / PowerBuilder source (.prg, .scx, .sru + DBF tables)
 git clone https://github.com/marius1973/legacybridge.git
 cd legacybridge
 docker compose up --build
-# open http://localhost:3000 — hero 100% · 148/148 · 99%; Run bundled sample
+# open http://localhost:3000 — hero, Product.cs, Spec; Download .NET solution .zip
 ```
 
 Without Docker:
@@ -151,7 +156,7 @@ src/
   LegacyBridge.Generator/ IR AST → .NET 8 DDD solution
   LegacyBridge.Equivalence/ IR oracle vs migrated .NET
   agents/                 extractor + MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
-  dashboard/              Next.js: hero metrics, ES/EN, GitHub, pipeline + table
+  dashboard/              Next.js: hero, artifacts (IR/spec/.NET/zip), pipeline + table
 evals/                    thresholds.json + golden-cases.json
 samples/
   vfp-inventory/          legacy → migrated → EQUIVALENCE-REPORT.md
@@ -165,6 +170,7 @@ docs/                     architecture, migration guide, demo assets, walkthroug
 - **Why does generate take `--spec`?** Agent 1's YAML is what names entities and fields. Without it the generator falls back to IR heuristics. The spec is not a side document.
 - **Why golden cases besides 100% equivalence?** Interpreter and emitter share the IR. Hand-computed `evals/golden-cases.json` checks the oracle independently. Those same numbers become generated xUnit tests.
 - **Why equivalence tests instead of snapshots?** Snapshot tests freeze behavior you don't understand. Equivalence tests run the legacy binary semantics against the new domain code on the *same* dataset — that is the property a business actually pays for.
+- **Why show IR / spec / .NET in the dashboard?** Equivalence numbers without the generated `Product.cs` hide the product. The pipeline used to drop those files in `/tmp`; the artifacts panel is the inspectable output.
 - **Why evals in CI?** The default path has no API key. Every parser/extractor/generator change is gated on extraction recall, compile, goldens, and functional-equivalence thresholds.
 
 ## Roadmap
@@ -177,7 +183,7 @@ docs/                     architecture, migration guide, demo assets, walkthroug
 - [x] **v0.6** — Next.js dashboard (`docker compose up` → localhost:3000)
 - [x] **v0.7** — PowerBuilder frontend (`samples/pb-billing`) → same IR
 - [x] **v0.8** — `generate --spec`, CFG cases, golden oracle, string ops, generated xUnit
-- [x] **v0.9** — dashboard UX: hero metrics, mobile cards, step detail, sample source
+- [x] **v0.9** — dashboard UX + artifacts panel (IR, spec, .NET files, zip)
 - [ ] **v1.0** — launch write-up
 
 ## Contributing

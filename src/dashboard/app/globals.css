@@ -67,6 +67,28 @@ th { color: var(--muted); font-weight: 600; }
 .skel div { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--panel), var(--line), var(--panel)); background-size: 200% 100%; animation: shine 1.2s linear infinite; }
 @keyframes shine { to { background-position: -200% 0; } }
 pre { white-space: pre-wrap; color: var(--fail); font-size: 13px; }
+.artifacts { margin-top: 28px; }
+.artifacts h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.tabs button {
+  background: var(--panel); color: var(--muted); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 10px; font-weight: 650; cursor: pointer;
+}
+.tabs button.on { background: var(--acc); color: #071018; border-color: var(--acc); }
+.tabs button.zip { margin-left: auto; background: var(--acc); color: #071018; border: 0; }
+.codeview { display: grid; grid-template-columns: 220px 1fr; gap: 10px; }
+.codeview aside { display: flex; flex-direction: column; gap: 4px; max-height: 480px; overflow: auto; }
+.codeview aside button {
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  text-align: left; font-family: ui-monospace, monospace; font-size: 12px;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer;
+}
+.codeview aside button.on { border-color: var(--acc); color: var(--acc); }
+.artifacts .code {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px; overflow: auto; max-height: 480px;
+  font: 12.5px/1.5 ui-monospace, monospace; color: var(--text);
+}
 
 @media (max-width: 700px) {
   .metrics { grid-template-columns: 1fr; }
@@ -80,4 +102,6 @@ pre { white-space: pre-wrap; color: var(--fail); font-size: 13px; }
     content: attr(data-label); position: absolute; left: 0; width: 36%;
     color: var(--muted); font-size: 11px; text-transform: uppercase;
   }
+  .codeview { grid-template-columns: 1fr; }
+  .codeview aside { flex-direction: row; flex-wrap: wrap; max-height: none; }
 }

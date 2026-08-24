@@ -5,6 +5,8 @@ import { copy, formatResult, readLang, writeLang, type Lang } from "@/lib/i18n";
 
 type Row = { id: string; routine: string; args: string; oracle: string; migrated: string; result: string };
 type Sample = { rate: string; skipped: string; rows: Row[] };
+type Artifacts = { ir: string; spec: string; files: { path: string; content: string }[]; report: string };
+type Tab = "code" | "ir" | "spec" | "report";
 type Step = { id: keyof typeof copy.es.steps; status: string; detail?: string };
 
 const STEP_IDS: Step["id"][] = ["analyze", "extract", "generate", "verify"];
@@ -34,6 +36,10 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [artifacts, setArtifacts] = useState<Artifacts | null>(null);
+  const [tab, setTab] = useState<Tab>("code");
+  const [activeFile, setActiveFile] = useState(0);
+  const [dl, setDl] = useState(false);
   const t = copy[lang];
 
   useEffect(() => {
@@ -48,10 +54,11 @@ export default function Page() {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((j: Sample & { source?: string; sourceName?: string }) => {
+      .then((j: Sample & { source?: string; sourceName?: string; artifacts?: Artifacts }) => {
         setSample({ rate: j.rate, skipped: j.skipped, rows: j.rows });
         if (j.source) setSource(j.source);
         if (j.sourceName) setSourceName(j.sourceName);
+        if (j.artifacts) setArtifacts(j.artifacts);
       })
       .catch(() => setErr("load"))
       .finally(() => setLoading(false));
@@ -60,6 +67,34 @@ export default function Page() {
   function pickLang(next: Lang) {
     setLang(next);
     writeLang(next);
+  }
+
+  async function downloadNet() {
+    if (!file) {
+      window.location.assign("/api/download");
+      return;
+    }
+    setDl(true);
+    setErr("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/download", { method: "POST", body });
+      if (!res.ok) {
+        setErr((await res.text()).slice(-1500) || t.runErr);
+        return;
+      }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "VfpInventory.zip";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      setErr(t.networkErr);
+    } finally {
+      setDl(false);
+    }
   }
 
   async function run() {
@@ -91,12 +126,17 @@ export default function Page() {
         for (const block of parts) {
           const line = block.replace(/^data:\s*/, "");
           if (!line) continue;
-          const ev = JSON.parse(line) as { step?: string; status?: string; detail?: string; report?: Sample; error?: string };
+          const ev = JSON.parse(line) as { step?: string; status?: string; detail?: string; report?: Sample; artifacts?: Artifacts; error?: string };
           if (ev.error) {
             failDetail = ev.error;
             setErr(ev.error);
           }
           if (ev.report) setSample(ev.report);
+          if (ev.artifacts) {
+            setArtifacts(ev.artifacts);
+            setTab("code");
+            setActiveFile(0);
+          }
           if (ev.step && ev.status) {
             if (ev.status === "fail") failDetail = ev.detail || ev.step;
             setSteps((prev) => prev.map((s) => (s.id === ev.step ? { ...s, status: ev.status!, detail: ev.detail } : s)));
@@ -209,6 +249,36 @@ export default function Page() {
             </table>
           </div>
         </>
+      )}
+      {artifacts && (
+        <section className="artifacts">
+          <h2>{t.artifacts}</h2>
+          <div className="tabs">
+            {(["code", "ir", "spec", "report"] as Tab[]).map((id) => (
+              <button key={id} type="button" className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+                {id === "code" ? t.tabCode : id === "ir" ? t.tabIr : id === "spec" ? t.tabSpec : t.tabReport}
+              </button>
+            ))}
+            <button type="button" className="zip" disabled={dl || busy} onClick={() => downloadNet()}>
+              {dl ? t.downloading : t.downloadZip}
+            </button>
+          </div>
+          {tab === "code" && (
+            <div className="codeview">
+              <aside>
+                {artifacts.files.map((f, i) => (
+                  <button key={f.path} type="button" className={i === activeFile ? "on" : ""} onClick={() => setActiveFile(i)}>
+                    {f.path}
+                  </button>
+                ))}
+              </aside>
+              <pre className="code"><code>{artifacts.files[activeFile]?.content}</code></pre>
+            </div>
+          )}
+          {tab === "ir" && <pre className="code">{artifacts.ir ? artifacts.ir.slice(0, 20000) : t.irPending}</pre>}
+          {tab === "spec" && <pre className="code">{artifacts.spec}</pre>}
+          {tab === "report" && <pre className="code">{artifacts.report}</pre>}
+        </section>
       )}
       {err && <pre>{err === "load" ? t.loadErr : err}</pre>}
     </main>

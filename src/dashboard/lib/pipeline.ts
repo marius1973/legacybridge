@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -71,6 +71,57 @@ export function sampleSource(cwd = repoRoot()): { name: string; text: string } {
   return { name, text: readFileSync(join(cwd, "samples", "vfp-inventory", "legacy", name), "utf8") };
 }
 
+export type ArtifactFile = { path: string; content: string };
+export type Artifacts = { ir: string; spec: string; files: ArtifactFile[]; report: string };
+
+export function collectFiles(dir: string, exts: string[]): ArtifactFile[] {
+  const out: ArtifactFile[] = [];
+  if (!existsSync(dir)) return out;
+  const walk = (d: string, prefix = "") => {
+    for (const entry of readdirSync(d, { withFileTypes: true })) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (entry.name !== "bin" && entry.name !== "obj") walk(join(d, entry.name), rel);
+        continue;
+      }
+      if (exts.some((e) => entry.name.endsWith(e)))
+        out.push({ path: rel, content: readFileSync(join(d, entry.name), "utf8") });
+    }
+  };
+  walk(dir);
+  out.sort((a, b) => rankFile(a.path) - rankFile(b.path) || a.path.localeCompare(b.path));
+  return out;
+}
+
+function rankFile(path: string): number {
+  if (path.endsWith("Domain/Product.cs")) return 0;
+  if (path.endsWith(".cs")) return 1;
+  return 2;
+}
+
+export function readArtifacts(work: string): Artifacts {
+  const ir = join(work, "ir.json");
+  const spec = join(work, "spec.yaml");
+  const report = join(work, "EQUIVALENCE-REPORT.md");
+  return {
+    ir: existsSync(ir) ? readFileSync(ir, "utf8") : "",
+    spec: existsSync(spec) ? readFileSync(spec, "utf8") : "",
+    files: collectFiles(join(work, "migrated"), [".cs", ".csproj", ".sln"]),
+    report: existsSync(report) ? readFileSync(report, "utf8") : "",
+  };
+}
+
+export function sampleArtifacts(cwd = repoRoot()): Artifacts {
+  const root = join(cwd, "samples", "vfp-inventory");
+  const spec = join(root, "business-spec.expected.yaml");
+  return {
+    ir: "",
+    spec: existsSync(spec) ? readFileSync(spec, "utf8") : "",
+    files: collectFiles(join(root, "migrated"), [".cs", ".csproj", ".sln"]),
+    report: sampleReport(cwd),
+  };
+}
+
 function stepDetail(name: string, stdout: string, work: string): string {
   const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
   if (name === "analyze") {
@@ -98,7 +149,7 @@ function stepDetail(name: string, stdout: string, work: string): string {
 export async function runPipeline(
   onStep: (step: string, status: "running" | "ok" | "fail", detail?: string) => void,
   sourcePath?: string,
-): Promise<{ ok: boolean; report: string }> {
+): Promise<{ ok: boolean; report: string; artifacts?: Artifacts }> {
   const cwd = repoRoot();
   const path = sourcePath ?? join(cwd, "samples", "vfp-inventory", "legacy");
   const work = mkdtempSync(join(tmpdir(), "lb-dash-"));
@@ -108,16 +159,22 @@ export async function runPipeline(
     ["generate", ["generate", path, "--output", join(work, "migrated"), "--build", "--spec", join(work, "spec.yaml")]],
     ["verify", ["verify", path, "--output", join(work, "EQUIVALENCE-REPORT.md"), "--min-match", "0.9"]],
   ];
-  for (const [name, args] of steps) {
-    onStep(name, "running");
-    const r = await runCli(args, cwd);
-    if (r.code !== 0) {
-      onStep(name, "fail", (r.stderr || r.stdout).slice(-1500));
-      return { ok: false, report: r.stderr || r.stdout };
-    }
+  try {
+    for (const [name, args] of steps) {
+      onStep(name, "running");
+      const r = await runCli(args, cwd);
+      if (r.code !== 0) {
+        onStep(name, "fail", (r.stderr || r.stdout).slice(-1500));
+        return { ok: false, report: r.stderr || r.stdout };
+      }
       onStep(name, "ok", stepDetail(name, r.stdout, work));
+    }
+    const artifacts = readArtifacts(work);
+    return { ok: true, report: artifacts.report, artifacts };
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+    cleanupUpload(sourcePath);
   }
-  return { ok: true, report: readFileSync(join(work, "EQUIVALENCE-REPORT.md"), "utf8") };
 }
 
 export function saveUpload(name: string, bytes: Buffer): string {
@@ -125,4 +182,30 @@ export function saveUpload(name: string, bytes: Buffer): string {
   const dest = join(dir, name.replace(/[^\w.-]/g, "_") || "upload.prg");
   writeFileSync(dest, bytes);
   return dest;
+}
+
+/** extract + generate --build --spec. Caller must rmSync(work). */
+export async function generateMigrated(sourcePath?: string): Promise<{ ok: true; work: string; migrated: string } | { ok: false; error: string }> {
+  const cwd = repoRoot();
+  const path = sourcePath ?? join(cwd, "samples", "vfp-inventory", "legacy");
+  const work = mkdtempSync(join(tmpdir(), "lb-dl-"));
+  const spec = join(work, "spec.yaml");
+  const migrated = join(work, "migrated");
+  const extract = await runCli(["extract", path, "--output", spec], cwd);
+  if (extract.code !== 0) {
+    rmSync(work, { recursive: true, force: true });
+    return { ok: false, error: (extract.stderr || extract.stdout).slice(-2000) };
+  }
+  const gen = await runCli(["generate", path, "--output", migrated, "--build", "--spec", spec], cwd);
+  if (gen.code !== 0) {
+    rmSync(work, { recursive: true, force: true });
+    return { ok: false, error: (gen.stderr || gen.stdout).slice(-2000) };
+  }
+  return { ok: true, work, migrated };
+}
+
+export function cleanupUpload(sourcePath?: string) {
+  if (!sourcePath) return;
+  const dir = dirname(sourcePath);
+  if (dir.includes("lb-up-")) rmSync(dir, { recursive: true, force: true });
 }
