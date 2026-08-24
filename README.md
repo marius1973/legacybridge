@@ -70,7 +70,7 @@ npm install --prefix src/dashboard
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/pb-billing/legacy --output ir-pb.json
 dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --output spec.yaml
-dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build
+dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build --spec spec.yaml
 dotnet run --project src/LegacyBridge.Cli -- verify samples/vfp-inventory/legacy --output samples/vfp-inventory/EQUIVALENCE-REPORT.md
 npm run dev --prefix src/dashboard
 # http://localhost:3000
@@ -82,7 +82,7 @@ npm run dev --prefix src/dashboard
 |---|---|
 | Extractor entities (`inv_calc`) | P=1.00 R=1.00 *(CI)* |
 | Extractor rules (`inv_calc`) | P=1.00 R=1.00 *(CI, threshold R≥0.8)* |
-| Functional equivalence (`inv_calc`) | **100%** (111/111, 1 SQL skipped) *(CI, threshold ≥90%)* |
+| Functional equivalence (`inv_calc`) | **100%** (148/148, 1 SQL skipped) *(CI, threshold ≥90%)* |
 | PowerBuilder NVO (`n_billing.sru`) vs same oracle | **100%** (108/108, 1 SQL skipped) |
 | Generated code compiling without manual edits | **100%** on `inv_calc` *(CI, 1 compile attempt)* |
 | Compile-fix loop iterations (`inv_calc`) | **0** — method bodies come from the IR AST, not an LLM |
@@ -140,6 +140,7 @@ A small, well-tested subset beats a broad, fragile one. Expressions are a typed 
 (`literal` / `identifier` / `unary` / `binary` / `call`); `RawText` is kept on each node.
 `--strict` fails on unknown statements; the default degrades them to raw `expression` nodes.
 Parser line coverage is **99%** (coverlet); CI fails the build below 80%.
+Step-by-step: [`docs/walkthrough.md`](docs/walkthrough.md).
 
 ## Repository layout
 
@@ -155,12 +156,14 @@ evals/                    CI thresholds (recall, compile, equivalence)
 samples/
   vfp-inventory/          legacy → migrated → EQUIVALENCE-REPORT.md
   pb-billing/             PowerBuilder NVO + DataWindow retrieve → same IR
-docs/                     architecture, migration guide, demo assets
+docs/                     architecture, migration guide, demo assets, walkthrough.md
 ```
 
 ## Design decisions
 
 - **Why an IR instead of direct LLM translation?** Deterministic parsing gives the agents a faithful, inspectable model of the code — and gives you a diffable artifact in code review. LLMs propose; the IR disposes.
+- **Why does generate take `--spec`?** Agent 1's YAML is what names entities and fields. Without it the generator falls back to IR heuristics. The spec is not a side document.
+- **Why golden cases besides 100% equivalence?** Interpreter and emitter share the IR. Hand-computed `evals/golden-cases.json` checks the oracle independently. Those same numbers become generated xUnit tests.
 - **Why equivalence tests instead of snapshots?** Snapshot tests freeze behavior you don't understand. Equivalence tests run the legacy binary semantics against the new domain code on the *same* dataset — that is the property a business actually pays for.
 - **Why evals in CI?** An LLM pipeline without evals is a demo. Every prompt/model change is gated on extraction precision and functional-equivalence thresholds.
 
@@ -173,6 +176,7 @@ docs/                     architecture, migration guide, demo assets
 - [x] **v0.5** — MCP server (`analyze_legacy`, `generate_dotnet`, `run_equivalence`)
 - [x] **v0.6** — Next.js dashboard (`docker compose up` → localhost:3000)
 - [x] **v0.7** — PowerBuilder frontend (`samples/pb-billing`) → same IR
+- [x] **v0.8** — `generate --spec`, CFG cases, golden oracle, string ops, generated xUnit
 - [ ] **v1.0** — launch write-up
 
 ## Contributing

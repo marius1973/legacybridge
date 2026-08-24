@@ -1,0 +1,12 @@
+{
+  "note": "Expected values computed by hand from the business rules — independent of IrInterpreter and CsharpEmitter.",
+  "cases": [
+    { "routine": "CalcStockValue", "args": { "tnQty": 1, "tnUnitCost": 10 }, "expected": 15 },
+    { "routine": "CalcStockValue", "args": { "tnQty": 100, "tnUnitCost": 150 }, "expected": 15300 },
+    { "routine": "CalcStockValue", "args": { "tnQty": 100, "tnUnitCost": 100 }, "expected": 10005 },
+    { "routine": "CalcStockValue", "args": { "tnQty": 0, "tnUnitCost": 0 }, "expected": 5 },
+    { "routine": "ApplyDiscount", "args": { "tnAmount": 100, "tnPercent": 10 }, "expected": 90 },
+    { "routine": "ApplyDiscount", "args": { "tnAmount": 100, "tnPercent": 60 }, "expected": 50 },
+    { "routine": "ApplyDiscount", "args": { "tnAmount": 100, "tnPercent": 0 }, "expected": 100 }
+  ]
+}

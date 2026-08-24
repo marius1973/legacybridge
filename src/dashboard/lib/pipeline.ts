@@ -15,8 +15,16 @@ export function repoRoot(): string {
 }
 
 function dotnetBin(): string {
-  const win = join("C:", "Program Files", "dotnet", "dotnet.exe");
-  return existsSync(win) ? win : "dotnet";
+  const root = process.env.DOTNET_ROOT;
+  if (root) {
+    const exe = join(root, process.platform === "win32" ? "dotnet.exe" : "dotnet");
+    if (existsSync(exe)) return exe;
+  }
+  if (process.platform === "win32") {
+    const x64 = join(process.env["ProgramFiles"] || "C:\\Program Files", "dotnet", "dotnet.exe");
+    if (existsSync(x64)) return x64;
+  }
+  return "dotnet";
 }
 
 export function runCli(args: string[], cwd = repoRoot()): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -68,7 +76,7 @@ export async function runPipeline(
   const steps: [string, string[]][] = [
     ["analyze", ["analyze", path, "--output", join(work, "ir.json")]],
     ["extract", ["extract", path, "--output", join(work, "spec.yaml")]],
-    ["generate", ["generate", path, "--output", join(work, "migrated"), "--build"]],
+    ["generate", ["generate", path, "--output", join(work, "migrated"), "--build", "--spec", join(work, "spec.yaml")]],
     ["verify", ["verify", path, "--output", join(work, "EQUIVALENCE-REPORT.md"), "--min-match", "0.9"]],
   ];
   for (const [name, args] of steps) {

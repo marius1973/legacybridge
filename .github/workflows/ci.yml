@@ -105,6 +105,10 @@ jobs:
         run: >
           dotnet run --project src/LegacyBridge.Cli --no-build --configuration Release --
           generate samples/vfp-inventory/legacy --output artifacts/migrated --build
+          --spec artifacts/spec.yaml
+
+      - name: Generated xUnit goldens
+        run: dotnet test artifacts/migrated --nologo --configuration Release
 
       - name: Build committed migrated sample
         run: dotnet build samples/vfp-inventory/migrated/VfpInventory.sln --nologo

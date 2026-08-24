@@ -53,4 +53,13 @@ public class CsharpEmitterTests
         Assert.Contains("return Math.Round", body);
         Assert.Contains("var lnValue", body);
     }
+
+    [Fact]
+    public void Maps_string_helpers()
+    {
+        var e = ExpressionParser.Parse("UPPER(ALLTRIM(tcName))");
+        var c = CsharpEmitter.Expr(e);
+        Assert.Contains("ToUpperInvariant", c);
+        Assert.Contains("Trim()", c);
+    }
 }

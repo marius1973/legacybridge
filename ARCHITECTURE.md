@@ -33,6 +33,7 @@ Why:
 ```jsonc
 {
   "SourceName": "inv_calc.prg",
+  "IrVersion": 1,
   "Routines": [
     {
       "Name": "CalcStockValue",
@@ -76,27 +77,39 @@ falls back to the IR mapping unless `LEGACYBRIDGE_LLM=required`.
 
 ## Agent 2: .NET generator
 
-`legacybridge generate` maps the IR AST to a four-project .NET 8 solution
-(`Domain` / `Application` / `Infrastructure` / `Api`) using C# string templates
-(no Scriban — the structure is small and fixed).
+`legacybridge generate [--spec spec.yaml]` maps the IR AST to a .NET 8 solution
+(`Domain` / `Application` / `Infrastructure` / `Api` / `Tests`) using C# string
+templates (no Scriban).
+
+**Entities come from the Agent 1 spec when `--spec` is passed.** `SpecInfer`
+(Hungarian-prefix heuristics on IR text) is only the fallback. Persistence is
+EF Core **InMemory** so the demo has no database; Postgres is a provider swap
+(`UseNpgsql`) later.
 
 Method bodies are **deterministic**: `CsharpEmitter` walks `IrExpression` /
 `IrStatement`. `ROUND` → `Math.Round`, `.AND.` → `&&`, `SCAN FOR` → `foreach` +
-`Where`, `REPLACE … WITH` → property assign. Embedded SQL stays a comment plus
-`IReadOnlyList<T>` stub so the solution still compiles.
+`Where`, `REPLACE … WITH` → property assign, `ALLTRIM`/`UPPER`/`LOWER`/`LEN` →
+string methods. Embedded SQL stays a comment plus `IReadOnlyList<T>` stub.
 
-`--build` runs `dotnet build` up to 3 times and logs each attempt. That is the
-compile-fix loop slot for an LLM repair pass later; on `inv_calc` the AST path
-succeeds on attempt 1 (0 retries). Output: `samples/vfp-inventory/migrated/`.
+`--build` runs `dotnet build` **once**. The compiler log is the slot for a
+future LLM repair pass — retrying the same command is not a fix loop.
+Generated `Tests/` encode hand-computed goldens from `evals/golden-cases.json`.
 
 ## Agent 3: equivalence
 
 `legacybridge verify` runs the same cases on two oracles:
 
-1. **IR interpreter** — executes the AST (arithmetic, IF, SCAN/REPLACE, `ROUND`).
+1. **IR interpreter** — executes the AST (arithmetic, strings, IF, SCAN/REPLACE, `ROUND`).
 2. **Migrated `ProductService`** — the generated .NET 8 application.
 
-Cases are a deterministic grid (zeros, negatives, cap-at-50, qty×cost around 10000) plus SCAN fixtures. Embedded SQL (`MonthlyReport`) is skipped, not failed. Threshold: `evals/thresholds.json` → `equivalence: 0.9`. Report: `samples/vfp-inventory/EQUIVALENCE-REPORT.md`.
+Cases are driven by **control-flow thresholds** extracted from `IF` literals
+(e.g. `> 10000` → 9999 / 10000 / 10001) plus a small grid. Extra parameters
+beyond the first two stay 0. Embedded SQL (`MonthlyReport`) is skipped, not
+failed. Threshold: `evals/thresholds.json` → `equivalence: 0.9`.
+
+**Known limit:** interpreter and emitter share the IR. A parser bug can make
+both wrong and still report 100%. Mitigation: `evals/golden-cases.json`
+(hand-computed) vs the interpreter in CI.
 
 ## MCP server
 

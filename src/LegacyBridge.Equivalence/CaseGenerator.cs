@@ -34,9 +34,89 @@ public static class CaseGenerator
                     Row(("stock", 3m), ("unit_cost", 4m), ("total_value", 0m))));
                 continue;
             }
-            cases.AddRange(Grid(r));
+            cases.AddRange(FromCfg(r));
         }
         return cases;
+    }
+
+    /// <summary>
+    /// Values from IF thresholds (n, n±1, n±0.01) plus a small grid.
+    /// Hits both sides of `> 10000` / `> 50` instead of a blind cartesian product.
+    /// </summary>
+    private static IEnumerable<EqCase> FromCfg(IrRoutine r)
+    {
+        var cuts = Thresholds(r.Body).Distinct().ToList();
+        var n = r.Parameters.Count;
+        if (n == 0)
+        {
+            yield return new EqCase($"{r.Name}/noparams", r.Name, new Dictionary<string, decimal>(), null);
+            yield break;
+        }
+
+        var aVals = ValuesFor(cuts, extra: [0m, -1m, 1m, 10m, 50m, 50.01m, 100m, 10000m, 100000m]);
+        if (n == 1)
+        {
+            foreach (var a in aVals)
+                yield return One(r, a);
+            yield break;
+        }
+
+        var bVals = ValuesFor(cuts, extra: [0m, 10m, 50m, 51m, 100m, 150m]);
+        if (aVals.Count * bVals.Count > 96)
+        {
+            aVals = ValuesFor(cuts, extra: [0m, 10m, 50m, 100m]);
+            bVals = ValuesFor(cuts, extra: [0m, 50m, 100m, 150m]);
+        }
+        foreach (var a in aVals)
+        foreach (var b in bVals)
+            yield return Two(r, a, b);
+    }
+
+    private static List<decimal> ValuesFor(IReadOnlyList<decimal> cuts, decimal[] extra)
+    {
+        var set = new SortedSet<decimal>(extra);
+        foreach (var t in cuts)
+        {
+            set.Add(t);
+            set.Add(t - 1);
+            set.Add(t + 1);
+            set.Add(t - 0.01m);
+            set.Add(t + 0.01m);
+        }
+        return set.ToList();
+    }
+
+    private static IEnumerable<decimal> Thresholds(IReadOnlyList<IrStatement>? body)
+    {
+        foreach (var s in Walk(body))
+        {
+            if (s.Kind != "if") continue;
+            foreach (var n in Literals(s.Expression))
+                yield return n;
+        }
+    }
+
+    private static IEnumerable<decimal> Literals(IrExpression? e)
+    {
+        switch (e)
+        {
+            case LiteralExpr { LiteralKind: "number" } n
+                when decimal.TryParse(n.Value, System.Globalization.CultureInfo.InvariantCulture, out var d):
+                yield return d;
+                break;
+            case BinaryExpr b:
+                foreach (var x in Literals(b.Left)) yield return x;
+                foreach (var x in Literals(b.Right)) yield return x;
+                break;
+            case UnaryExpr u:
+                foreach (var x in Literals(u.Operand)) yield return x;
+                break;
+            case CallExpr c:
+                foreach (var a in c.Args)
+                foreach (var x in Literals(a))
+                    yield return x;
+                break;
+        }
     }
 
     private static bool HasKind(IrRoutine r, string kind) =>
@@ -55,27 +135,6 @@ public static class CaseGenerator
 
     private static EqCase Scan(string routine, string tag, params Dictionary<string, decimal>[] rows) =>
         new($"{routine}/{tag}", routine, new Dictionary<string, decimal>(), rows.Select(Clone).ToList());
-
-    private static IEnumerable<EqCase> Grid(IrRoutine r)
-    {
-        decimal[] nums = [0m, -1m, 1m, 10m, 50m, 50.01m, 100m, 10000m, 100000m];
-        var n = r.Parameters.Count;
-        if (n == 0)
-        {
-            yield return new EqCase($"{r.Name}/noparams", r.Name, new Dictionary<string, decimal>(), null);
-            yield break;
-        }
-        if (n == 1)
-        {
-            foreach (var a in nums)
-                yield return One(r, a);
-            yield break;
-        }
-        // ponytail: first two params only; extra params stay 0
-        foreach (var a in nums)
-        foreach (var b in (decimal[])[0m, 10m, 50m, 51m, 100m, 150m])
-            yield return Two(r, a, b);
-    }
 
     private static EqCase One(IrRoutine r, decimal a) =>
         new($"{r.Name}({a})", r.Name, new Dictionary<string, decimal> { [r.Parameters[0]] = a }, null);

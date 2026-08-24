@@ -22,6 +22,14 @@ public static class CsharpEmitter
         UnaryExpr u => $"{(u.Op == "-" ? "-" : "+")}{Expr(u.Operand, id)}",
         CallExpr c when c.Name.Equals("ROUND", StringComparison.OrdinalIgnoreCase) =>
             $"Math.Round({Expr(c.Args[0], id)}, (int)({Expr(c.Args[1], id)}), MidpointRounding.AwayFromZero)",
+        CallExpr c when c.Name.Equals("ALLTRIM", StringComparison.OrdinalIgnoreCase) =>
+            $"{Expr(c.Args[0], id)}.Trim()",
+        CallExpr c when c.Name.Equals("UPPER", StringComparison.OrdinalIgnoreCase) =>
+            $"{Expr(c.Args[0], id)}.ToUpperInvariant()",
+        CallExpr c when c.Name.Equals("LOWER", StringComparison.OrdinalIgnoreCase) =>
+            $"{Expr(c.Args[0], id)}.ToLowerInvariant()",
+        CallExpr c when c.Name.Equals("LEN", StringComparison.OrdinalIgnoreCase) =>
+            $"(decimal){Expr(c.Args[0], id)}.Length",
         CallExpr c => $"{Names.Pascal(c.Name)}({string.Join(", ", c.Args.Select(a => Expr(a, id)))})",
         RawExpr r => "/* " + r.RawText.Replace("*/", "") + " */ 0m",
         _ => "0m"

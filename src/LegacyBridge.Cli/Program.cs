@@ -10,7 +10,7 @@ return Cli.Run(args);
 internal static class Cli
 {
     private const string Usage =
-        "usage:\n  legacybridge analyze <path> [--output ir.json] [--strict]\n  legacybridge extract <path> [--output spec.yaml] [--strict] [--llm]\n  legacybridge generate <path> [--output dir] [--strict] [--build]\n  legacybridge verify <path> [--output EQUIVALENCE-REPORT.md] [--min-match 0.9]";
+        "usage:\n  legacybridge analyze <path> [--output ir.json] [--strict]\n  legacybridge extract <path> [--output spec.yaml] [--strict] [--llm]\n  legacybridge generate <path> [--output dir] [--strict] [--build] [--spec spec.yaml]\n  legacybridge verify <path> [--output EQUIVALENCE-REPORT.md] [--min-match 0.9]";
 
     public static int Run(string[] args)
     {
@@ -27,6 +27,7 @@ internal static class Cli
         var minMatch = 0.9;
         string? path = null;
         string? outputPath = null;
+        string? specPath = null;
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--strict") { strict = true; continue; }
@@ -49,6 +50,16 @@ internal static class Cli
                     return 2;
                 }
                 outputPath = args[++i];
+                continue;
+            }
+            if (args[i] == "--spec")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    Console.Error.WriteLine(Usage);
+                    return 2;
+                }
+                specPath = args[++i];
                 continue;
             }
             path ??= args[i];
@@ -81,7 +92,7 @@ internal static class Cli
         }
 
         if (cmd == "generate")
-            return Generate(programs, outputPath ?? "generated", build);
+            return Generate(programs, outputPath ?? "generated", build, specPath);
 
         if (cmd == "verify")
             return Verify(programs, outputPath, minMatch);
@@ -115,9 +126,20 @@ internal static class Cli
         Console.WriteLine($"IR written to {outputPath}");
     }
 
-    private static int Generate(List<IrProgram> programs, string outputDir, bool build)
+    private static int Generate(List<IrProgram> programs, string outputDir, bool build, string? specPath)
     {
-        var result = SolutionGenerator.Write(programs, outputDir);
+        LegacyBridge.Generator.Spec.BusinessSpec? spec = null;
+        if (specPath is not null)
+        {
+            if (!File.Exists(specPath))
+            {
+                Console.Error.WriteLine($"spec not found: {specPath}");
+                return 1;
+            }
+            spec = LegacyBridge.Generator.Spec.SpecReader.Load(specPath);
+            Console.WriteLine($"using spec {specPath} ({spec.Entities.Count} entities)");
+        }
+        var result = SolutionGenerator.Write(programs, outputDir, spec: spec);
         Console.WriteLine($"generated {result.Files.Count} files → {result.SlnPath}");
         if (!build)
             return 0;

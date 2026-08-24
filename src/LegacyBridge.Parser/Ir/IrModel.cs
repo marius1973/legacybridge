@@ -8,7 +8,8 @@ namespace LegacyBridge.Parser.Ir;
 /// </summary>
 public sealed record IrProgram(
     string SourceName,
-    IReadOnlyList<IrRoutine> Routines);
+    IReadOnlyList<IrRoutine> Routines,
+    int IrVersion = 1);
 
 public sealed record IrRoutine(
     string Name,

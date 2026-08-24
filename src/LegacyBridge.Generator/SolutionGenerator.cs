@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using LegacyBridge.Generator.Spec;
 using LegacyBridge.Parser.Ir;
 
 namespace LegacyBridge.Generator;
@@ -8,11 +9,17 @@ public sealed record GenerateResult(string SlnPath, IReadOnlyList<string> Files)
 
 public static class SolutionGenerator
 {
-    public static GenerateResult Write(IReadOnlyList<IrProgram> programs, string outputDir, string ns = "VfpInventory")
+    public static GenerateResult Write(
+        IReadOnlyList<IrProgram> programs,
+        string outputDir,
+        string ns = "VfpInventory",
+        BusinessSpec? spec = null)
     {
         outputDir = Path.GetFullPath(outputDir);
         Directory.CreateDirectory(outputDir);
-        var entities = SpecInfer.Entities(programs);
+        var entities = spec is { Entities.Count: > 0 }
+            ? spec.Entities.Select(e => new EntityModel(e.Name, e.Fields.ToList())).ToList()
+            : SpecInfer.Entities(programs);
         var entity = entities.FirstOrDefault();
         var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -20,10 +27,12 @@ public static class SolutionGenerator
         var appCsproj = $"{ns}.Application.csproj";
         var infCsproj = $"{ns}.Infrastructure.csproj";
         var apiCsproj = $"{ns}.Api.csproj";
+        var testCsproj = $"{ns}.Tests.csproj";
         var dGuid = Guid.NewGuid();
         var aGuid = Guid.NewGuid();
         var iGuid = Guid.NewGuid();
         var pGuid = Guid.NewGuid();
+        var tGuid = Guid.NewGuid();
 
         files[$"Domain/{domainCsproj}"] = SdkCsproj();
         files[$"Application/{appCsproj}"] = SdkCsproj($"    <ProjectReference Include=\"..\\Domain\\{domainCsproj}\" />");
@@ -50,7 +59,15 @@ public static class SolutionGenerator
 
         files[$"Application/{ServiceName(entity)}.cs"] = ServiceFile(ns, programs, entity);
         files["Api/Program.cs"] = ApiFile(ns, entity, programs);
-        files[$"{ns}.sln"] = Sln(ns, domainCsproj, appCsproj, infCsproj, apiCsproj, dGuid, aGuid, iGuid, pGuid);
+        var goldens = GoldenCases.Load().Where(g => programs.SelectMany(p => p.Routines).Any(r => r.Name == g.Routine)).ToList();
+        var needsRepo = programs.SelectMany(p => p.Routines).Any(NeedsRepo);
+        if (goldens.Count > 0 && entity is not null)
+        {
+            files[$"Tests/{testCsproj}"] = TestCsproj(ns, appCsproj, domainCsproj);
+            files[$"Tests/{ServiceName(entity)}Tests.cs"] = TestFile(ns, entity, goldens, needsRepo);
+        }
+        files[$"{ns}.sln"] = Sln(ns, domainCsproj, appCsproj, infCsproj, apiCsproj, testCsproj,
+            dGuid, aGuid, iGuid, pGuid, tGuid, goldens.Count > 0 && entity is not null);
 
         foreach (var (rel, content) in files)
         {
@@ -62,7 +79,7 @@ public static class SolutionGenerator
         return new GenerateResult(Path.Combine(outputDir, $"{ns}.sln"), files.Keys.ToList());
     }
 
-    public static (bool Ok, string Log, int Attempts) Build(string slnPath, int maxAttempts = 3)
+    public static (bool Ok, string Log, int Attempts) Build(string slnPath, int maxAttempts = 1)
     {
         var log = new StringBuilder();
         for (int i = 1; i <= maxAttempts; i++)
@@ -86,16 +103,12 @@ public static class SolutionGenerator
             log.Append(stderr);
             if (p.ExitCode == 0)
                 return (true, log.ToString(), i);
-            // ponytail: LLM repair hook (compiler log → agent, max 3) when --llm is wired
+            // LLM repair hook: mutate source from compiler log, then retry. Not wired yet.
         }
         return (false, log.ToString(), maxAttempts);
     }
 
-    private static string DotnetPath()
-    {
-        var x64 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe");
-        return File.Exists(x64) ? x64 : "dotnet";
-    }
+    private static string DotnetPath() => DotnetLocator.Find();
 
     private static string ServiceName(EntityModel? e) => e is null ? "LegacyService" : e.Name + "Service";
 
@@ -290,8 +303,75 @@ public static class SolutionGenerator
     private static string Kebab(string name) =>
         string.Concat(name.Select((c, i) => i > 0 && char.IsUpper(c) ? "-" + char.ToLowerInvariant(c) : char.ToLowerInvariant(c).ToString()));
 
-    private static string Sln(string ns, string d, string a, string i, string p,
-        Guid dg, Guid ag, Guid ig, Guid pg)
+    private static string TestCsproj(string ns, string appCsproj, string domainCsproj) => $"""
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net8.0</TargetFramework>
+            <Nullable>enable</Nullable>
+            <ImplicitUsings>enable</ImplicitUsings>
+            <IsPackable>false</IsPackable>
+          </PropertyGroup>
+          <ItemGroup>
+            <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+            <PackageReference Include="xunit" Version="2.9.2" />
+            <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+          </ItemGroup>
+          <ItemGroup>
+            <ProjectReference Include="..\Application\{appCsproj}" />
+            <ProjectReference Include="..\Domain\{domainCsproj}" />
+          </ItemGroup>
+        </Project>
+        """;
+
+    private static string TestFile(string ns, EntityModel entity, IReadOnlyList<GoldenCase> goldens, bool needsRepo)
+    {
+        var svc = ServiceName(entity);
+        var groups = goldens.GroupBy(g => g.Routine, StringComparer.OrdinalIgnoreCase);
+        var sb = new StringBuilder();
+        sb.AppendLine($"using {ns}.Application;");
+        sb.AppendLine($"using {ns}.Domain;");
+        sb.AppendLine("using Xunit;");
+        sb.AppendLine();
+        sb.AppendLine($"namespace {ns}.Tests;");
+        sb.AppendLine();
+        sb.AppendLine($"public class {svc}Tests");
+        sb.AppendLine("{");
+        sb.AppendLine(needsRepo
+            ? $"    private static {svc} Svc() => new(new MemRepo());"
+            : $"    private static {svc} Svc() => new();");
+        sb.AppendLine();
+        foreach (var g in groups)
+        {
+            var routine = g.Key;
+            var sample = g.First();
+            var paramList = string.Join(", ", sample.Args.Keys.Select(k => $"decimal {k}"));
+            var call = string.Join(", ", sample.Args.Keys);
+            sb.AppendLine("    [Theory]");
+            foreach (var c in g)
+            {
+                var nums = string.Join(", ", c.Args.Values.Append(c.Expected).Select(GoldenCases.Invariant));
+                sb.AppendLine($"    [InlineData({nums})]");
+            }
+            sb.AppendLine($"    public void {routine}_matches_hand_computed_oracle({paramList}, decimal expected)");
+            sb.AppendLine("    {");
+            sb.AppendLine($"        Assert.Equal(expected, Svc().{routine}({call}));");
+            sb.AppendLine("    }");
+            sb.AppendLine();
+        }
+        if (needsRepo)
+        {
+            sb.AppendLine("    private sealed class MemRepo : I" + entity.Name + "Repository");
+            sb.AppendLine("    {");
+            sb.AppendLine($"        public IReadOnlyList<{entity.Name}> GetAll() => Array.Empty<{entity.Name}>();");
+            sb.AppendLine("        public void Save() { }");
+            sb.AppendLine("    }");
+        }
+        sb.AppendLine("}");
+        return sb.ToString();
+    }
+
+    private static string Sln(string ns, string d, string a, string i, string p, string t,
+        Guid dg, Guid ag, Guid ig, Guid pg, Guid tg, bool includeTests)
     {
         const string cs = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
         string G(Guid g) => "{" + g.ToString().ToUpperInvariant() + "}";
@@ -304,7 +384,8 @@ public static class SolutionGenerator
                 $"\t\t{id}.Release|Any CPU.ActiveCfg = Release|Any CPU",
                 $"\t\t{id}.Release|Any CPU.Build.0 = Release|Any CPU");
         }
-        return string.Join("\n",
+        var lines = new List<string>
+        {
             "Microsoft Visual Studio Solution File, Format Version 12.00",
             "# Visual Studio Version 17",
             $"Project(\"{cs}\") = \"{ns}.Domain\", \"Domain\\{d}\", \"{G(dg)}\"",
@@ -315,14 +396,25 @@ public static class SolutionGenerator
             "EndProject",
             $"Project(\"{cs}\") = \"{ns}.Api\", \"Api\\{p}\", \"{G(pg)}\"",
             "EndProject",
-            "Global",
-            "\tGlobalSection(SolutionConfigurationPlatforms) = preSolution",
-            "\t\tDebug|Any CPU = Debug|Any CPU",
-            "\t\tRelease|Any CPU = Release|Any CPU",
-            "\tEndGlobalSection",
-            "\tGlobalSection(ProjectConfigurationPlatforms) = postSolution",
-            cfg(dg), cfg(ag), cfg(ig), cfg(pg),
-            "\tEndGlobalSection",
-            "EndGlobal");
+        };
+        if (includeTests)
+        {
+            lines.Add($"Project(\"{cs}\") = \"{ns}.Tests\", \"Tests\\{t}\", \"{G(tg)}\"");
+            lines.Add("EndProject");
+        }
+        lines.Add("Global");
+        lines.Add("\tGlobalSection(SolutionConfigurationPlatforms) = preSolution");
+        lines.Add("\t\tDebug|Any CPU = Debug|Any CPU");
+        lines.Add("\t\tRelease|Any CPU = Release|Any CPU");
+        lines.Add("\tEndGlobalSection");
+        lines.Add("\tGlobalSection(ProjectConfigurationPlatforms) = postSolution");
+        lines.Add(cfg(dg));
+        lines.Add(cfg(ag));
+        lines.Add(cfg(ig));
+        lines.Add(cfg(pg));
+        if (includeTests) lines.Add(cfg(tg));
+        lines.Add("\tEndGlobalSection");
+        lines.Add("EndGlobal");
+        return string.Join("\n", lines);
     }
 }
