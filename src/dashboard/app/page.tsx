@@ -1,41 +1,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { copy, formatResult, readLang, writeLang, type Lang } from "@/lib/i18n";
 
 type Row = { id: string; routine: string; args: string; oracle: string; migrated: string; result: string };
 type Sample = { rate: string; skipped: string; rows: Row[] };
-type Step = { id: string; label: string; status: string; detail?: string };
+type Step = { id: keyof typeof copy.es.steps; status: string; detail?: string };
 
-const STEPS: { id: string; label: string }[] = [
-  { id: "analyze", label: "Parser → IR" },
-  { id: "extract", label: "Business spec" },
-  { id: "generate", label: ".NET generate" },
-  { id: "verify", label: "Equivalence" },
-];
+const STEP_IDS: Step["id"][] = ["analyze", "extract", "generate", "verify"];
 
 export default function Page() {
+  const [lang, setLang] = useState<Lang>("es");
   const [sample, setSample] = useState<Sample | null>(null);
-  const [steps, setSteps] = useState<Step[]>(STEPS.map((s) => ({ ...s, status: "idle" })));
+  const [steps, setSteps] = useState<Step[]>(STEP_IDS.map((id) => ({ id, status: "idle" })));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const t = copy[lang];
+
+  useEffect(() => {
+    const next = readLang();
+    setLang(next);
+    document.documentElement.lang = next;
+  }, []);
 
   useEffect(() => {
     fetch("/api/sample")
       .then((r) => r.json())
       .then(setSample)
-      .catch(() => setErr("could not load committed report"));
+      .catch(() => setErr("load"));
   }, []);
+
+  function pickLang(next: Lang) {
+    setLang(next);
+    writeLang(next);
+  }
 
   async function run() {
     setBusy(true);
     setErr("");
     setSample(null);
-    setSteps(STEPS.map((s) => ({ ...s, status: "idle" })));
+    setSteps(STEP_IDS.map((id) => ({ id, status: "idle" })));
     const body = new FormData();
     if (file) body.append("file", file);
     const res = await fetch("/api/run", { method: "POST", body });
-    if (!res.body) { setBusy(false); setErr("no stream"); return; }
+    if (!res.body) { setBusy(false); setErr(t.noStream); return; }
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
@@ -61,40 +70,48 @@ export default function Page() {
 
   return (
     <main>
-      <h1>LegacyBridge</h1>
-      <p className="sub">VFP / PowerBuilder → .NET 8. Same cases on the IR oracle and the generated code.</p>
+      <div className="head">
+        <div>
+          <h1>LegacyBridge</h1>
+          <p className="sub">{t.sub}</p>
+        </div>
+        <div className="lang" role="group" aria-label={t.lang}>
+          <button type="button" className={lang === "es" ? "on" : ""} onClick={() => pickLang("es")}>ES</button>
+          <button type="button" className={lang === "en" ? "on" : ""} onClick={() => pickLang("en")}>EN</button>
+        </div>
+      </div>
       <div className="row">
         <button type="button" disabled={busy} onClick={run}>
-          {busy ? "Running…" : file ? `Migrate ${file.name}` : "Run bundled sample"}
+          {busy ? t.running : file ? `${t.migrate} ${file.name}` : t.run}
         </button>
         <label className="file">
           <input type="file" accept=".prg,.sru,.srd,.txt" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          {file ? file.name : "or upload .prg / .sru"}
+          {file ? file.name : t.upload}
         </label>
       </div>
       <div className="steps">
         {steps.map((s) => (
           <div className="step" key={s.id}>
-            <b>{s.label}</b>
+            <b>{t.steps[s.id]}</b>
             <span className={s.status === "ok" ? "ok" : s.status === "fail" ? "fail" : ""}>
-              {s.status === "idle" ? "—" : s.status}
+              {t.status[s.status as keyof typeof t.status] ?? s.status}
             </span>
           </div>
         ))}
       </div>
       {sample && (
         <>
-          <div className="rate ok">{sample.rate} match</div>
-          <p className="sub">{sample.rows.length} cases · {sample.skipped} skipped</p>
+          <div className="rate ok">{sample.rate} {t.match}</div>
+          <p className="sub">{sample.rows.length} {t.cases} · {sample.skipped} {t.skipped}</p>
           <div className="wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Case</th>
-                  <th>Routine</th>
-                  <th>Oracle</th>
-                  <th>Migrated</th>
-                  <th>Result</th>
+                  <th>{t.case}</th>
+                  <th>{t.routine}</th>
+                  <th>{t.oracle}</th>
+                  <th>{t.migrated}</th>
+                  <th>{t.result}</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,7 +122,7 @@ export default function Page() {
                     <td>{r.oracle}</td>
                     <td>{r.migrated}</td>
                     <td className={r.result === "match" ? "ok" : r.result.startsWith("skip") ? "skip" : "fail"}>
-                      {r.result}
+                      {formatResult(r.result, t)}
                     </td>
                   </tr>
                 ))}
@@ -114,7 +131,7 @@ export default function Page() {
           </div>
         </>
       )}
-      {err && <pre>{err}</pre>}
+      {err && <pre>{err === "load" ? t.loadErr : err}</pre>}
     </main>
   );
 }
