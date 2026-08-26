@@ -41,6 +41,15 @@ public sealed class ProductService
         _repo.Save();
     }
 
+    public void PurgeStale()
+    {
+        foreach (var item in _repo.GetAll().Where(item => (item.Year < 2000m)))
+        {
+            // UPDATE products SET stock = 0 WHERE year < 2000
+        }
+        _repo.Save();
+    }
+
     public IReadOnlyList<Product> MonthlyReport(decimal tnYear)
     {
         // SELECT product , SUM ( total_value ) FROM products WHERE year = tnYear GROUP BY product ORDER BY 2 DESC

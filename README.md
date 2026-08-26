@@ -75,7 +75,7 @@ npm install --prefix src/dashboard
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/vfp-inventory/legacy --output ir.json
 dotnet run --project src/LegacyBridge.Cli -- analyze samples/pb-billing/legacy --output ir-pb.json
 dotnet run --project src/LegacyBridge.Cli -- extract samples/vfp-inventory/legacy --output spec.yaml
-dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build --spec spec.yaml
+dotnet run --project src/LegacyBridge.Cli -- generate samples/vfp-inventory/legacy --output samples/vfp-inventory/migrated --build --spec samples/vfp-inventory/business-spec.expected.yaml
 dotnet run --project src/LegacyBridge.Cli -- verify samples/vfp-inventory/legacy --output samples/vfp-inventory/EQUIVALENCE-REPORT.md
 npm run dev --prefix src/dashboard
 # http://localhost:3000
@@ -87,12 +87,14 @@ npm run dev --prefix src/dashboard
 |---|---|
 | Extractor entities (`inv_calc`) | P=1.00 R=1.00 *(CI)* |
 | Extractor rules (`inv_calc`) | P=1.00 R=1.00 *(CI, threshold R≥0.8)* |
-| Functional equivalence (`inv_calc`) | **100%** (148/148, 1 SQL skipped) *(CI, threshold ≥90%)* |
+| Functional equivalence (`inv_calc`) | **100%** (148/148, 2 SQL skipped) *(CI, threshold ≥90%)* |
 | PowerBuilder NVO (`n_billing.sru`) vs same oracle | **100%** (145/145, 1 SQL skipped) |
 | Generated code compiling without manual edits | **100%** on `inv_calc` *(CI, 1 compile attempt)* |
 | Compile-fix loop iterations (`inv_calc`) | **0** — method bodies come from the IR AST, not an LLM |
 | Migration time (sample) | minutes vs. ~40 h manual estimate |
 | Eval cases in CI | extract R≥0.8 · generate compiles · verify ≥90% (VFP + PB) · goldens · MCP `--self-test` |
+
+The bundled `inv_calc.prg` has five routines: a cross-routine `DO ApplyDiscount` after `RevalueAll`, and `PurgeStale` (`SCAN` + `UPDATE`). Those two SQL routines are skipped, not failed. Committed output: `samples/vfp-inventory/migrated/` (includes `Tests/`).
 
 *Targets are published as CI-enforced thresholds, not marketing: the build fails if a change drops equivalence (or extractor recall) below the threshold.*
 

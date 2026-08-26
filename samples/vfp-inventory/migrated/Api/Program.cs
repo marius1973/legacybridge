@@ -11,5 +11,6 @@ var app = b.Build();
 app.MapGet("/calc-stock-value", (decimal tnQty, decimal tnUnitCost, ProductService s) => s.CalcStockValue(tnQty, tnUnitCost));
 app.MapGet("/apply-discount", (decimal tnAmount, decimal tnPercent, ProductService s) => s.ApplyDiscount(tnAmount, tnPercent));
 app.MapPost("/revalue-all", (ProductService s) => { s.RevalueAll(); return Results.Ok(); });
+app.MapPost("/purge-stale", (ProductService s) => { s.PurgeStale(); return Results.Ok(); });
 app.MapGet("/monthly-report", (decimal tnYear, ProductService s) => s.MonthlyReport(tnYear));
 app.Run();

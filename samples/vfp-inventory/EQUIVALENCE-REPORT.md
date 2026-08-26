@@ -1,6 +1,6 @@
 # Equivalence report — `inv_calc.prg`
 
-**Match rate:** 100.0% (148/148) · skipped 1
+**Match rate:** 100.0% (148/148) · skipped 2
 
 | Case | Routine | Args | Oracle | Migrated | Result |
 |---|---|---|---|---|---|
@@ -152,4 +152,5 @@
 | `RevalueAll/in-stock` | RevalueAll | rows=2 | 25;99 | 25;99 | match |
 | `RevalueAll/empty-skip` | RevalueAll | rows=1 | 7 | 7 | match |
 | `RevalueAll/neg-qty` | RevalueAll | rows=2 | 1;12 | 1;12 | match |
+| `PurgeStale/sql` | PurgeStale |  | — | — | skip: embedded SQL not in oracle |
 | `MonthlyReport/sql` | MonthlyReport |  | — | — | skip: embedded SQL not in oracle |
