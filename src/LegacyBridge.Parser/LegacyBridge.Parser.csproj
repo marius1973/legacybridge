@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <PackageId>LegacyBridge.Parser</PackageId>
+    <Version>0.9.1</Version>
+    <Description>VFP / PowerBuilder parser → unified IR (JSON). Consumed by LegacyBridge and LegacyLens.</Description>
+    <Authors>Mario Manrique</Authors>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
 </Project>

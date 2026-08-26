@@ -9,7 +9,8 @@ namespace LegacyBridge.Parser.Ir;
 public sealed record IrProgram(
     string SourceName,
     IReadOnlyList<IrRoutine> Routines,
-    int IrVersion = 1);
+    int IrVersion = 1,
+    string IrSchemaVersion = "1"); // "1" aligned with IrVersion; LegacyLens asserts this
 
 public sealed record IrRoutine(
     string Name,
@@ -18,9 +19,9 @@ public sealed record IrRoutine(
     IReadOnlyList<IrStatement> Body);
 
 public sealed record IrStatement(
-    string Kind,                        // assign | if | for | scan | doWhile | sql | return | expression
+    string Kind,                        // assign | if | for | scan | doWhile | sql | return | call | expression
     int Line,
-    string? Target = null,              // assignment target
+    string? Target = null,              // assignment target, or callee for Kind == "call"
     IrExpression? Expression = null,
     string? LoopVariable = null,        // FOR variable
     IrExpression? From = null,          // FOR lower bound
@@ -28,7 +29,8 @@ public sealed record IrStatement(
     IrExpression? Step = null,          // FOR step
     IReadOnlyList<IrStatement>? Then = null,
     IReadOnlyList<IrStatement>? Else = null,
-    IReadOnlyList<IrStatement>? Body = null);
+    IReadOnlyList<IrStatement>? Body = null,
+    string? SqlVerb = null);            // select | insert | update | delete when Kind == "sql"
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "Kind")]
 [JsonDerivedType(typeof(LiteralExpr), "literal")]
@@ -37,7 +39,7 @@ public sealed record IrStatement(
 [JsonDerivedType(typeof(UnaryExpr), "unary")]
 [JsonDerivedType(typeof(CallExpr), "call")]
 [JsonDerivedType(typeof(RawExpr), "raw")]
-public abstract record IrExpression(string RawText);
+public abstract record IrExpression(string RawText); // stable surface for LegacyLens; do not require AST Kind yet
 
 public sealed record LiteralExpr(string Value, string LiteralKind, string RawText) : IrExpression(RawText);
 

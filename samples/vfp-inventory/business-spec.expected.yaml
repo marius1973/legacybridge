@@ -21,6 +21,9 @@ rules:
   - id: R6
     description: total_value is replaced with stock * unit_cost
     routine: RevalueAll
+  - id: R7
+    description: Scan while year < 2000
+    routine: PurgeStale
 flows:
   - name: CalcStockValue
     kind: procedure
@@ -33,6 +36,10 @@ flows:
   - name: RevalueAll
     kind: procedure
     parameters: []
+    steps: [expression, scan, call]
+  - name: PurgeStale
+    kind: procedure
+    parameters: []
     steps: [expression, scan]
   - name: MonthlyReport
     kind: procedure
@@ -41,5 +48,7 @@ flows:
 queries:
   - routine: RevalueAll
     sql: REPLACE total_value WITH stock * unit_cost
+  - routine: PurgeStale
+    sql: UPDATE products SET stock = 0 WHERE year < 2000
   - routine: MonthlyReport
     sql: SELECT product, SUM(total_value) FROM products WHERE year = tnYear GROUP BY product ORDER BY 2 DESC

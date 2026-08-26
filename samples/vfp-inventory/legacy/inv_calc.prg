@@ -32,6 +32,14 @@ PROCEDURE RevalueAll
     SCAN FOR stock > 0
         REPLACE total_value WITH stock * unit_cost
     ENDSCAN
+    DO ApplyDiscount
+ENDPROC
+
+PROCEDURE PurgeStale
+    USE products
+    SCAN FOR year < 2000
+        UPDATE products SET stock = 0 WHERE year < 2000
+    ENDSCAN
 ENDPROC
 
 PROCEDURE MonthlyReport

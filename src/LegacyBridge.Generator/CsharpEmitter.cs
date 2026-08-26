@@ -117,7 +117,7 @@ public static class CsharpEmitter
                     break;
                 case "sql":
                     yield return $"{pad}// {raw(s)}";
-                    if (entity is not null)
+                    if (entity is not null && s.SqlVerb is null or "select")
                         yield return $"{pad}return _repo.GetAll();";
                     break;
                 default:

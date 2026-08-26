@@ -137,8 +137,9 @@ Current parser coverage (v0.9):
 | `IF / ELSEIF / ELSE / ENDIF` | ✅ | ✅ `if … then` / `end if` |
 | `FOR ... TO ... STEP / ENDFOR` / `NEXT` | ✅ | ✅ `end for` |
 | `SCAN / ENDSCAN`, `DO WHILE / ENDDO` | ✅ | 🔜 SCAN · ✅ `do while` / `loop` |
+| `DO <routine>` / `name(args)` as `call` | ✅ | ✅ via VFP normalize |
 | Expressions (typed AST) | ✅ | ✅ same AST |
-| Embedded SQL (`SELECT/INSERT/UPDATE/DELETE`) | raw capture | raw capture |
+| Embedded SQL (`SELECT/INSERT/UPDATE/DELETE`) | raw + `SqlVerb` | raw + `SqlVerb` |
 | Forms (`.scx`) / DataWindows | 🔜 | retrieve SQL only (`.srd`) |
 
 A small, well-tested subset beats a broad, fragile one. Expressions are a typed AST

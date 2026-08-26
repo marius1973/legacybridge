@@ -25,6 +25,31 @@ public sealed class VfpParser
         return new VfpParser(tokens, strict).ParseProgram(sourceName);
     }
 
+    /// <summary>
+    /// Non-throwing parse for scanners (LegacyLens). <see cref="Parse"/> stays fail-fast.
+    /// </summary>
+    public static bool TryParse(string source, string sourceName, out IrProgram? program, out ParserException? error, bool strict = false)
+    {
+        try
+        {
+            program = Parse(source, sourceName, strict);
+            error = null;
+            return true;
+        }
+        catch (ParserException ex)
+        {
+            program = null;
+            error = ex;
+            return false;
+        }
+        catch (LexerException ex)
+        {
+            program = null;
+            error = new ParserException(ex.Message);
+            return false;
+        }
+    }
+
     public IrProgram ParseProgram(string sourceName)
     {
         var routines = new List<IrRoutine>();
@@ -107,13 +132,17 @@ public sealed class VfpParser
                 return ParseScan();
             case TokenKind.Do when PeekKind(1) == TokenKind.While:
                 return ParseDoWhile();
+            case TokenKind.Do when PeekKind(1) == TokenKind.Identifier:
+                return ParseDoCall();
+            case TokenKind.Identifier when PeekKind(1) == TokenKind.LeftParen:
+                return ParseCall();
             case TokenKind.With:
                 return ParseWith();
             case TokenKind.Return:
                 Advance();
                 return new IrStatement("return", t.Line, Expression: TryParseExpr());
             case TokenKind.Select or TokenKind.Insert or TokenKind.Update or TokenKind.Delete:
-                return new IrStatement("sql", t.Line, Expression: new RawExpr(CaptureExpression()));
+                return ParseSql();
             default:
                 if (_strict)
                     throw Error(t, $"Unknown statement '{t.Lexeme}'");
@@ -207,6 +236,36 @@ public sealed class VfpParser
         var body = ParseBlock(TokenKind.EndScan);
         Expect(TokenKind.EndScan, "Expected ENDSCAN");
         return new IrStatement("scan", scan.Line, Expression: condition, Body: body);
+    }
+
+    private IrStatement ParseDoCall()
+    {
+        var tok = Expect(TokenKind.Do, "Expected DO");
+        var name = Expect(TokenKind.Identifier, "Expected routine name").Lexeme;
+        var args = CaptureExpression();
+        return new IrStatement("call", tok.Line, Target: name, Expression: string.IsNullOrEmpty(args) ? null : new RawExpr(args));
+    }
+
+    private IrStatement ParseCall()
+    {
+        var tok = Current;
+        var name = Expect(TokenKind.Identifier, "Expected routine name").Lexeme;
+        var args = CaptureExpression();
+        return new IrStatement("call", tok.Line, Target: name, Expression: new RawExpr(args));
+    }
+
+    private IrStatement ParseSql()
+    {
+        var tok = Current;
+        var verb = tok.Kind switch
+        {
+            TokenKind.Select => "select",
+            TokenKind.Insert => "insert",
+            TokenKind.Update => "update",
+            TokenKind.Delete => "delete",
+            _ => null,
+        };
+        return new IrStatement("sql", tok.Line, Expression: new RawExpr(CaptureExpression()), SqlVerb: verb);
     }
 
     private IrStatement ParseDoWhile()
@@ -343,7 +402,11 @@ public sealed class VfpParser
     }
 
     private static ParserException Error(Token token, string message) =>
-        new($"{message} — got {token}");
+        new($"{message} — got {token}", token.Line, token.Column);
 }
 
-public sealed class ParserException(string message) : Exception(message);
+public sealed class ParserException(string message, int line = 0, int column = 0) : Exception(message)
+{
+    public int Line { get; } = line;
+    public int Column { get; } = column;
+}

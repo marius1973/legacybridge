@@ -98,6 +98,61 @@ public class ParserTests
         var program = VfpParser.Parse(src, "sql.prg");
         var sql = Assert.Single(program.Routines[0].Body.Where(s => s.Kind == "sql"));
         Assert.Contains("FROM clients", sql.Expression!.RawText);
+        Assert.Equal("select", sql.SqlVerb);
+    }
+
+    [Fact]
+    public void Parses_do_and_paren_calls()
+    {
+        const string src = """
+            PROCEDURE Hub
+                DO ApplyDiscount
+                CalcStockValue(1, 2)
+            ENDPROC
+            """;
+        var program = VfpParser.Parse(src, "calls.prg");
+        var calls = program.Routines[0].Body.Where(s => s.Kind == "call").ToList();
+        Assert.Equal(2, calls.Count);
+        Assert.Equal("ApplyDiscount", calls[0].Target);
+        Assert.Equal("CalcStockValue", calls[1].Target);
+    }
+
+    [Fact]
+    public void Sql_statements_set_SqlVerb()
+    {
+        const string src = """
+            PROCEDURE Mutate
+                UPDATE products SET stock = 0 WHERE year < 2000
+                DELETE FROM products WHERE stock = 0
+            ENDPROC
+            """;
+        var program = VfpParser.Parse(src, "sql.prg");
+        var sql = program.Routines[0].Body.Where(s => s.Kind == "sql").ToList();
+        Assert.Equal("update", sql[0].SqlVerb);
+        Assert.Equal("delete", sql[1].SqlVerb);
+    }
+
+    [Fact]
+    public void TryParse_returns_false_without_throwing()
+    {
+        const string src = """
+            PROCEDURE Bad
+                IF .T.
+            ENDPROC
+            """;
+        var ok = VfpParser.TryParse(src, "bad.prg", out var program, out var error);
+        Assert.False(ok);
+        Assert.Null(program);
+        Assert.NotNull(error);
+        Assert.True(error!.Line > 0);
+    }
+
+    [Fact]
+    public void Ir_json_includes_schema_version()
+    {
+        var program = VfpParser.Parse(Sample, "sample.prg");
+        Assert.Equal("1", program.IrSchemaVersion);
+        Assert.Contains("\"IrSchemaVersion\"", IrSerializer.ToJson(program));
     }
 
     [Fact]
@@ -122,7 +177,7 @@ public class ParserTests
     {
         var src = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "inv_calc.prg"));
         var program = VfpParser.Parse(src, "inv_calc.prg");
-        Assert.Equal(4, program.Routines.Count);
+        Assert.Equal(5, program.Routines.Count);
 
         var calc = program.Routines[0];
         var assign = Assert.Single(calc.Body.Where(s => s.Kind == "assign"));
@@ -138,5 +193,9 @@ public class ParserTests
         var cond = Assert.IsType<BinaryExpr>(scan.Expression);
         Assert.Equal(">", cond.Op);
         Assert.Equal("stock", Assert.IsType<IdentifierExpr>(cond.Left).Name);
+        Assert.Equal("ApplyDiscount", Assert.Single(program.Routines[2].Body.Where(s => s.Kind == "call")).Target);
+
+        var purgeSql = Assert.Single(program.Routines[3].Body.SelectMany(s => s.Body ?? []).Where(s => s.Kind == "sql"));
+        Assert.Equal("update", purgeSql.SqlVerb);
     }
 }

@@ -22,6 +22,17 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
+      - name: Pack LegacyBridge.Parser
+        run: dotnet pack src/LegacyBridge.Parser/LegacyBridge.Parser.csproj --no-build --configuration Release --output artifacts/nupkg
+
+      - name: Upload Parser nupkg
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LegacyBridge.Parser.nupkg
+          path: artifacts/nupkg/*.nupkg
+          if-no-files-found: warn
+
       - name: Format check
         run: dotnet format --verify-no-changes --no-restore || echo "::warning::format drift — run dotnet format"
 

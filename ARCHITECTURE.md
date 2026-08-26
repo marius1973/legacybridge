@@ -59,6 +59,7 @@ Temp dirs are deleted after the pipeline / zip stream.
 {
   "SourceName": "inv_calc.prg",
   "IrVersion": 1,
+  "IrSchemaVersion": "1",
   "Routines": [
     {
       "Name": "CalcStockValue",
@@ -79,15 +80,26 @@ Temp dirs are deleted after the pipeline / zip stream.
 ```
 
 Expressions are a typed AST (`literal` / `identifier` / `unary` / `binary` / `call`).
-Each node keeps `RawText` for traceability. Unknown statements and embedded SQL
-degrade to `raw`.
+Each node keeps `RawText`. **External consumers (LegacyLens) should read `RawText`,
+not walk the AST**, until the AST is declared stable across both repos.
+
+Statement `Kind` includes `call` (`DO <id>` and `Identifier(args)` at statement
+start; `Target` is the callee). Embedded SQL is `Kind: "sql"` with optional
+`SqlVerb`: `"select" | "insert" | "update" | "delete"` only — closed list, no
+other verbs. Unknown statements degrade to `raw`.
+
+`IrSchemaVersion` (`"1"`, aligned with `IrVersion`) is the field consumers assert
+against. CI packs `LegacyBridge.Parser` as a nupkg artifact; it is not published
+to a feed yet.
 
 ## Error strategy
 
-The parser fails fast with line/column information (`ParserException`).
-Unknown statements degrade to `expression` + `RawExpr` so partial migrations
-still produce a complete IR. Pass `strict: true` (CLI `--strict`) to reject them
-instead. Embedded SQL is always captured as `raw`, even in strict mode.
+`VfpParser.Parse` fails fast with line/column (`ParserException`). `TryParse`
+returns `false` + the exception instead of throwing — for scanners (LegacyLens)
+that must keep going after one bad file. Unknown statements degrade to
+`expression` + `RawExpr` so partial migrations still produce a complete IR.
+Pass `strict: true` (CLI `--strict`) to reject them instead. Embedded SQL is
+always captured as `raw`, even in strict mode.
 
 ## Agent 1: business spec
 
@@ -130,7 +142,7 @@ Generated `Tests/` encode hand-computed goldens from `evals/golden-cases.json`.
 Cases are driven by **control-flow thresholds** extracted from `IF` literals
 (e.g. `> 10000` → 9999 / 10000 / 10001) plus a small grid. Extra parameters
 beyond the first two stay 0. Embedded SQL (`MonthlyReport`) is skipped, not
-failed. Threshold: `evals/thresholds.json` → `equivalence: 0.9`.
+failed (`MonthlyReport`, `PurgeStale`). Threshold: `evals/thresholds.json` → `equivalence: 0.9`.
 
 **Known limit:** interpreter and emitter share the IR. A parser bug can make
 both wrong and still report 100%. Mitigation: `evals/golden-cases.json`

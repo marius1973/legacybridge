@@ -18,7 +18,7 @@ public static class PbParser
         var sql = DataWindowRetrieve(source);
         if (sql is null)
             return new IrProgram(sourceName, []);
-        IrStatement[] body = [new("sql", 1, Expression: new RawExpr(sql))];
+        IrStatement[] body = [new("sql", 1, Expression: new RawExpr(sql), SqlVerb: SqlVerbOf(sql))];
         return new IrProgram(sourceName, [new IrRoutine(name, "procedure", [], body)]);
     }
 
@@ -35,5 +35,15 @@ public static class PbParser
         var m = Regex.Match(source, @"retrieve\s*=\s*""((?:[^""]|"""")*)""",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         return m.Success ? m.Groups[1].Value.Replace("\"\"", "\"", StringComparison.Ordinal) : null;
+    }
+
+    private static string? SqlVerbOf(string sql)
+    {
+        var i = 0;
+        while (i < sql.Length && char.IsWhiteSpace(sql[i])) i++;
+        var end = i;
+        while (end < sql.Length && char.IsLetter(sql[end])) end++;
+        var verb = sql[i..end].ToLowerInvariant();
+        return verb is "select" or "insert" or "update" or "delete" ? verb : null;
     }
 }

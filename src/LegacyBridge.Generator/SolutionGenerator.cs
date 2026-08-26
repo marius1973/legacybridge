@@ -260,7 +260,7 @@ public static class SolutionGenerator
     {
         if (Flatten(r.Body).Any(s => s.Kind == "return" && s.Expression is not null))
             return "decimal";
-        if (entity is not null && Flatten(r.Body).Any(s => s.Kind == "sql"))
+        if (entity is not null && Flatten(r.Body).Any(s => s.Kind == "sql" && s.SqlVerb is null or "select"))
             return $"IReadOnlyList<{entity.Name}>";
         return "void";
     }
